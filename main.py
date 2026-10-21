@@ -1,66 +1,72 @@
-import os, threading, time
-from flask import Flask
+
+import os
 import requests
-import telebot
+from flask import Flask
+from threading import Thread
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
+
+# --- 1. САЙТ БАРОИ РЕКЛАМА ---
+SITE_URL = "https://cryptotj-dushanbe.blogspot.com"
+CHANNEL_URL = "https://t.me/tjikiston" # Агар канал надорӣ, ҳаминро ҳам SITE_URL кун
 
 TOKEN = os.getenv("BOT_TOKEN")
-SITE = "https://cryptotj-dushanbe.blogspot.com"
 
-flask_app = Flask(__name__)
-
-@flask_app.route('/')
+app = Flask(__name__)
+@app.route('/')
 def home():
-    return "Bot is alive!"
+    return "Bot is Alive! ✅"
 
-# --- Flask фавран кор мекунад ---
-def run_flask():
-    port = int(os.environ.get("PORT", 10000))
-    flask_app.run(host='0.0.0.0', port=port)
-
-# --- Bot дар паси پرده ---
-def run_bot():
-    time.sleep(3) # Flask аввал кушода шавад
-    bot = telebot.TeleBot(TOKEN, threaded=False)
+def get_rates():
     try:
-        bot.remove_webhook()
-        time.sleep(2)
-    except: pass
+        # Курси воқеӣ
+        r = requests.get("https://api.exchangerate-api.com/v4/latest/USD", timeout=10).json()
+        usd_tjs = r['rates']['TJS']
+        rub_tjs = r['rates']['TJS'] / r['rates']['RUB']
+        return usd_tjs, rub_tjs
+    except:
+        return 10.9, 0.112  # Агар интернет набошад
 
-    def get_c():
-        c="bitcoin,ethereum,binancecoin,solana,dogecoin,toncoin,tether,tron,cardano,ripple,shiba-inu,avalanche-2,polkadot,litecoin"
-        u=f"https://api.coingecko.com/api/v3/simple/price?ids={c}&vs_currencies=usd"
-        return requests.get(u,headers={"User-Agent":"Mozilla/5.0"},timeout=15).json()
-    def get_f():
-        try:
-            fr=requests.get("https://api.exchangerate-api.com/v4/latest/USD",timeout=10).json()
-            return fr['rates']['TJS'],fr['rates']['TJS']/fr['rates']['RUB'],fr['rates']['TJS']/fr['rates']['EUR']
-        except: return 10.85,0.1220,11.80
-    def ft(): return f"\n\n🌐 {SITE}\n📲 Обуна!"
+def promo_keyboard():
+    keyboard = [
+        [InlineKeyboardButton("🌐 Сомонаро кушо - Курси пурра", url=SITE_URL)],
+        [InlineKeyboardButton("📢 Канал - Хабарҳои фаврӣ", url=CHANNEL_URL)]
+    ]
+    return InlineKeyboardMarkup(keyboard)
 
-    @bot.message_handler(commands=['start','kurs'])
-    def kurs(m):
-        try:
-            r=get_c();usd,rub,eur=get_f()
-            s=f"💱 14 КУРС {time.strftime('%H:%M')}\n\n"
-            s+=f"BTC ${r['bitcoin']['usd']:,.0f}\nETH ${r['ethereum']['usd']:,.0f}\nBNB ${r['binancecoin']['usd']:,.0f}\nSOL ${r['solana']['usd']:,.0f}\nDOGE ${r['dogecoin']['usd']:.3f}\nTON ${r['toncoin']['usd']:.2f}\nUSDT ${r['tether']['usd']:.2f}\nTRX ${r['tron']['usd']:.3f}\nADA ${r['cardano']['usd']:.2f}\nXRP ${r['ripple']['usd']:.2f}\nSHIB ${r['shiba-inu']['usd']:.6f}\nAVAX ${r['avalanche-2']['usd']:.0f}\nDOT ${r['polkadot']['usd']:.2f}\nLTC ${r['litecoin']['usd']:.0f}\n\n💵 {usd:.2f} TJS\n₽ {rub:.4f} TJS\n💶 {eur:.2f} TJS"+ft()
-            bot.reply_to(m,s)
-        except Exception as e: bot.reply_to(m,f"Хато:{e}")
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    usd, rub = get_rates()
+    text = (
+        f"Салом! 👋\n\n"
+        f"💵 1 USD = {usd:.3f} TJS\n"
+        f"💵 1 RUB = {rub:.3f} TJS\n\n"
+        f"Навиш: Рубл чанд? / Доллар чанд?"
+    )
+    await update.message.reply_text(text, reply_markup=promo_keyboard())
 
-    @bot.message_handler(func=lambda m:True)
-    def qa(m):
-        t=m.text.lower()
-        try:
-            r=get_c();usd,rub,eur=get_f()
-            if "рубл" in t or "rub" in t: bot.reply_to(m,f"₽ 1 Рубл = {rub:.4f} TJS\n1000 ₽ = {rub*1000:.2f} TJS"+ft())
-            elif "доллар" in t: bot.reply_to(m,f"💵 1$ = {usd:.2f} TJS"+ft())
-            elif "btc" in t or "биткоин" in t: bot.reply_to(m,f"₿ BTC ${r['bitcoin']['usd']:,.0f}"+ft())
-            else: bot.reply_to(m,f"Навиш: Рубл чанд? Доллар чанд? /kurs"+ft())
-        except Exception as e: bot.reply_to(m,f"Хато:{e}")
+async def kurs_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.message.text.lower()
+    usd, rub = get_rates()
+    
+    if "рубл" in msg or "rub" in msg or "/kurs" in msg:
+        text = f"💰 КУРСИ РУБЛ\n\n💵 1 RUB = {rub:.4f} TJS\n💵 1000 RUB = {rub*1000:.2f} TJS\n\n📅 Имрӯз"
+    elif "доллар" in msg or "доллар" in msg or "usd" in msg:
+        text = f"💰 КУРСИ ДОЛЛАР\n\n💵 1 USD = {usd:.3f} TJS\n\n📅 Имрӯз"
+    else:
+        text = f"💱 КУРСИ АРЗ\n\n💵 1 USD = {usd:.3f} TJS\n💵 1 RUB = {rub:.4f} TJS"
 
-    while True:
-        try: bot.infinity_polling(timeout=20,long_polling_timeout=20)
-        except: time.sleep(5)
+    await update.message.reply_text(text, reply_markup=promo_keyboard())
+
+def run_flask():
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
 
 if __name__ == '__main__':
-    threading.Thread(target=run_bot, daemon=True).start()
-    run_flask()
+    Thread(target=run_flask, daemon=True).start()
+    
+    app_bot = ApplicationBuilder().token(TOKEN).build()
+    app_bot.add_handler(CommandHandler("start", start))
+    app_bot.add_handler(CommandHandler("kurs", kurs_handler))
+    app_bot.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, kurs_handler))
+    
+    print("Бот оғоз шуд...")
+    app_bot.run_polling()
