@@ -1,52 +1,46 @@
 import os
 import threading
 from flask import Flask
-from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes
+import telebot
 import requests
 
 TOKEN = os.getenv("BOT_TOKEN")
-print(f"Token exists: {bool(TOKEN)}")
-
+bot = telebot.TeleBot(TOKEN, threaded=False)
 flask_app = Flask(__name__)
 
 @flask_app.route('/')
 def home():
     return "Bot is Live!"
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Salom! Bot kor mekunad! 🚀\n/price btc - narx")
+@bot.message_handler(commands=['start'])
+def start(message):
+    bot.reply_to(message, "Salom! Bot kor mekunad! /price btc")
 
-async def price_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    coin = "bitcoin"
-    if context.args:
-        coin = context.args[0].lower()
-        if coin == "btc":
-            coin = "bitcoin"
-        if coin == "eth":
-            coin = "ethereum"
+@bot.message_handler(commands=['price'])
+def price_cmd(message):
     try:
-        url = f"https://api.coingecko.com/api/v3/simple/price?ids={coin}&vs_currencies=usd"
-        r = requests.get(url, timeout=10)
+        parts = message.text.split()
+        coin = "bitcoin"
+        if len(parts) > 1:
+            c = parts[1].lower()
+            if c == "btc": c = "bitcoin"
+            if c == "eth": c = "ethereum"
+            coin = c
+        r = requests.get(f"https://api.coingecko.com/api/v3/simple/price?ids={coin}&vs_currencies=usd", timeout=10)
         j = r.json()
         if coin in j:
-            await update.message.reply_text(f"{coin.upper()}: ${j[coin]['usd']}")
+            bot.reply_to(message, f"{coin}: ${j[coin]['usd']}")
         else:
-            await update.message.reply_text("Coin yoft nashud. /price btc")
+            bot.reply_to(message, "Coin yoft nashud")
     except Exception as e:
-        await update.message.reply_text(f"Xato: {e}")
+        bot.reply_to(message, f"Xato: {e}")
 
 def run_flask():
     port = int(os.environ.get("PORT", 10000))
     flask_app.run(host="0.0.0.0", port=port)
 
 def run_bot():
-    print("Bot starting...")
-    app = Application.builder().token(TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("price", price_cmd))
-    print("Bot polling started!")
-    app.run_polling()
+    bot.infinity_polling()
 
 if __name__ == "__main__":
     threading.Thread(target=run_flask, daemon=True).start()
