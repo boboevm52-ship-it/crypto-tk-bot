@@ -1,104 +1,53 @@
-import telebot, requests, re, time, os
-from datetime import datetime
+ import telebot
+import requests
 
-TOKEN = os.getenv("BOT_TOKEN")
-BLOG_URL = "https://cryptotj-dushanbe.blogspot.com/2025/10/blog-post.html"
-
+TOKEN = "ТОКЕНИ_ХУДАТРО_ГУЗОР"
 bot = telebot.TeleBot(TOKEN)
-passed_users = set()
-last_code = ""
 
 # 50 ДАВЛАТ
-COUNTRIES = ["USD","EUR","RUB","KZT","UZS","CNY","TRY","GBP","AED","SAR","INR","PKR","AZN","AMD","GEL","KGS","BYN","UAH","JPY","KRW","AUD","CAD","CHF","SEK","NOK","DKK","PLN","CZK","HUF","RON","BGN","RSD","MKD","THB","MYR","SGD","HKD","NZD","BRL","MXN","EGP","QAR","KWD","BHD","OMR","JOD","LBP","IQD","AFN"]
+RATES = {
+    "USD": 9.22, "EUR": 10.36, "RUB": 0.112, "CNY": 1.38, "KZT": 0.0206,
+    "KGS": 0.104, "UZS": 0.00073, "TRY": 0.26, "GBP": 12.10, "AED": 2.51,
+    "CHF": 11.2, "JPY": 0.061, "KRW": 0.0067, "INR": 0.11, "PKR": 0.033,
+    "AFN": 0.13, "AZN": 5.42, "GEL": 3.40, "TMT": 2.63, "UAH": 0.22,
+    "CAD": 6.75, "AUD": 6.05, "SAR": 2.45, "QAR": 2.53, "KWD": 30.1,
+    "BHD": 24.4, "AMD": 0.023, "BYN": 2.82, "PLN": 2.38, "SEK": 0.89,
+    "NOK": 0.86, "DKK": 1.38, "SGD": 7.05, "MYR": 1.97, "THB": 0.25,
+    "BRL": 1.65, "MXN": 0.50, "EGP": 0.18, "ILS": 2.55, "CZK": 0.40,
+    "RON": 2.08, "HUF": 0.025, "BGN": 5.29, "RSD": 0.088, "NZD": 5.55,
+    "IDR": 0.00056, "PHP": 0.16, "VND": 0.00036, "MDL": 0.51, "IQD": 0.007
+}
 
-def get_secret():
-    global last_code
-    try:
-        url = f"{BLOG_URL}?t={int(time.time())}"
-        r = requests.get(url, timeout=15, headers={'User-Agent':'Mozilla/5.0','Cache-Control':'no-cache'})
-        m = re.findall(r'Коди имрӯз:\s*([A-Z0-9]+)', r.text, re.I)
-        if m:
-            new_code = m[-1].upper().strip()
-            if new_code != last_code and last_code != "":
-                print(f"КОД ИВАЗ: {last_code} -> {new_code} - ҲАМА Тоза шуд!")
-                passed_users.clear()
-            last_code = new_code
-            return new_code
-    except Exception as e:
-        print(f"Хатогӣ: {e}")
-    return last_code or "DUSHANBE8888"
+CRYPTO = {"BTC": 620000, "ETH": 35000, "USDT": 9.22, "BNB": 5500, "SOL": 1500, "TON": 55}
 
-def get_data():
-    try:
-        rates = requests.get("https://api.exchangerate-api.com/v4/latest/USD", timeout=10).json()['rates']
-    except:
-        rates = {"RUB":95,"EUR":0.92,"KZT":490,"TRY":34,"GBP":0.79}
-    try:
-        ids = "bitcoin,ethereum,tether,solana,tron,binancecoin,dogecoin,cardano,ripple,toncoin"
-        cg = requests.get(f"https://api.coingecko.com/api/v3/simple/price?ids={ids}&vs_currencies=usd", timeout=15).json()
-    except:
-        cg = {"bitcoin":{"usd":81364},"ethereum":{"usd":2400},"tether":{"usd":1},"solana":{"usd":105},"tron":{"usd":0.24},"binancecoin":{"usd":600},"dogecoin":{"usd":0.12},"cardano":{"usd":0.45},"ripple":{"usd":0.55},"toncoin":{"usd":5.5}}
-    return rates, cg
+def understand(text):
+    t = text.lower()
+    # ТОҶИКӢ ФАҲМАД
+    if any(w in t for w in ["доллар","долар","бакс","usd","$","dollar"]):
+        return f"🇺🇸 Доллари Америка\n1 USD = {RATES['USD']} TJS"
+    if any(w in t for w in ["евро","еуро","eur"]):
+        return f"🇪🇺 Евро\n1 EUR = {RATES['EUR']} TJS"
+    if any(w in t for w in ["рубл","rub"]):
+        return f"🇷🇺 Рубли Руси\n1 RUB = {RATES['RUB']} TJS"
+    if any(w in t for w in ["юан","cny","юани"]):
+        return f"🇨🇳 Юани Хитой\n1 CNY = {RATES['CNY']} TJS"
+    if any(w in t for w in ["тенге","kzt"]):
+        return f"🇰🇿 Тенге\n1 KZT = {RATES['KZT']} TJS"
+    if any(w in t for w in ["биткоин","btc","биток"]):
+        return f"₿ Биткоин\n1 BTC = {CRYPTO['BTC']} TJS"
+    if any(w in t for w in ["эфир","eth"]):
+        return f"Ξ Эфириум\n1 ETH = {CRYPTO['ETH']} TJS"
+    if any(w in t for w in ["курс","нарх","чанд","пул","курби","чико","хама","50"]):
+        txt = "💵 КУРСИ 50 ДАВЛАТ:\n\n"
+        for k,v in list(RATES.items())[:20]:
+            txt += f"1 {k} = {v} TJS\n"
+        txt += "\nНавиш: Доллар, Евро, Рубл, Биткоин"
+        return txt
+    return "Нафаҳмидам 😅\nНавиш: Доллар чанд? Евро? Биткоин? Курси хама?"
 
 @bot.message_handler(func=lambda m: True)
-def all_handler(message):
-    txt = message.text.strip()
-    up = txt.upper()
-    low = txt.lower()
-    real = get_secret()
-    uid = message.from_user.id
+def handler(m):
+    bot.reply_to(m, understand(m.text))
 
-    # 1. КОДИ НАВ
-    if up == real:
-        passed_users.add(uid)
-        bot.reply_to(message, f"✅ Гузаштӣ бро! Код: {real}\n\nБарои дидани курс навиш:\nкурс / пул / чанд пул / 50")
-        return
-
-    # 2. КОДИ КӮҲНА
-    if "DUSHANBE" in up and up != real:
-        bot.reply_to(message, f"⛔️ Ин код кӯҳна шуд бро!\n\nКоди нав: {real}\nСайт: cryptotj-dushanbe.blogspot.com")
-        return
-
-    # 3. КОД НАЗАДААСТ
-    if uid not in passed_users:
-        bot.reply_to(message, f"⛔️ Аввал код зан бро:\n{real}\nСайт: cryptotj-dushanbe.blogspot.com")
-        return
-
-    # 4. ТОҶИКИРО МЕФАҲМАД - КУРС
-    tajik_keys = ["курс","пул","нарх","чанд","50","ҳама","биткоин","доллар","евро","рубл","btc","курси"]
-    if any(k in low for k in tajik_keys):
-        rates, cg = get_data()
-        now = datetime.now().strftime("%d.%m.%Y %H:%M")
-
-        text = f"💰 КУРСИ ЗИНДА {now}\nКод: {real}\n\n"
-        text += f"--- 💵 50 ДАВЛАТ ---\n"
-        text += f"🇺🇸 USD = 9.20 TJS\n"
-        if "EUR" in rates: text += f"🇪🇺 EUR = {9.20/rates['EUR']:.2f} TJS\n"
-        if "RUB" in rates: text += f"🇷🇺 100 RUB = {9.20/rates['RUB']*100:.2f} TJS\n"
-        if "KZT" in rates: text += f"🇰🇿 1000 KZT = {9.20/rates['KZT']*1000:.2f} TJS\n"
-        if "TRY" in rates: text += f"🇹🇷 TRY = {9.20/rates['TRY']:.2f} TJS\n"
-        if "GBP" in rates: text += f"🇬🇧 GBP = {9.20/rates['GBP']:.2f} TJS\n"
-        if "CNY" in rates: text += f"🇨🇳 CNY = {9.20/rates['CNY']:.2f} TJS\n"
-        text += f"\n... ва боз 43 давлати дигар\n"
-        
-        text += f"\n--- ₿ 10 КРИПТО ---\n"
-        text += f"₿ BTC = ${cg.get('bitcoin',{}).get('usd',0):,.2f}\n"
-        text += f"♦️ ETH = ${cg.get('ethereum',{}).get('usd',0):,.2f}\n"
-        text += f"💵 USDT = ${cg.get('tether',{}).get('usd',0)}\n"
-        text += f"☀️ SOL = ${cg.get('solana',{}).get('usd',0):,.2f}\n"
-        text += f"🔺 TRX = ${cg.get('tron',{}).get('usd',0):.4f}\n"
-        text += f"🟡 BNB = ${cg.get('binancecoin',{}).get('usd',0):,.2f}\n"
-        text += f"🐶 DOGE = ${cg.get('dogecoin',{}).get('usd',0):.4f}\n"
-        text += f"🔵 ADA = ${cg.get('cardano',{}).get('usd',0):.4f}\n"
-        text += f"💧 XRP = ${cg.get('ripple',{}).get('usd',0):.4f}\n"
-        text += f"💎 TON = ${cg.get('toncoin',{}).get('usd',0):.2f}\n"
-        text += f"\nБо забони тоҷикӣ навиш, мефаҳмам!"
-
-        bot.reply_to(message, text)
-        return
-
-    bot.reply_to(message, f"Навиш: курс бро!")
-
-print("Бот тайёр: 50 давлат + 10 крипто + код автоматӣ + тоҷикӣ!")
-get_secret()
+print("Бот кор мекунад...")
 bot.infinity_polling()
