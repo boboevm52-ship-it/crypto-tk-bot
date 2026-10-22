@@ -12,7 +12,7 @@ bot = telebot.TeleBot(TOKEN, threaded=False)
 app = Flask(__name__)
 
 BLOG_URL = "https://cryptotj-dushanbe.blogspot.com/2026/10/blog-post_22.html"
-SECRET_CODE = "CRYPTO2025"
+SECRET_CODE = "
 passed = {}
 
 def get_fiat():
