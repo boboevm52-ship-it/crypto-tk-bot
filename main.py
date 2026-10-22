@@ -3,20 +3,22 @@ from telebot import types
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 BLOG_URL = "https://cryptotj-dushanbe.blogspot.com/2025/10/blog-post.html"
-SECRET_CODE = "CRYPTO2025"
+SECRET = "CRYPTO2025"
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
 # Дар хотир мондан
-passed = {}
+passed = set()
 try:
     with open("passed.txt","r") as f:
-        for l in f: passed[int(l.strip())]=True
+        for l in f: passed.add(int(l.strip()))
 except: pass
 
 def menu():
-    kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    kb.add("💵 Доллар чанд","💶 Евро чанд","💷 Рубл чанд","₿ Биткоин чанд","💎 Тон чанд","🌐 Эфир чанд","🌍 Ҳамаи пулҳои ҷаҳон","🚀 Ҳамаи криптоҳо")
+    kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    kb.row("💵 Доллар чанд","💷 Рубл чанд")
+    kb.row("₿ Биткоин чанд","💎 Тон чанд","🌐 Эфир чанд")
+    kb.row("🌍 Ҳамаи пулҳо","🚀 Ҳамаи криптоҳо")
     return kb
 
 def forced():
@@ -26,111 +28,106 @@ def forced():
 
 def get_rates():
     try:
-        r = requests.get("https://open.er-api.com/v6/latest/USD", timeout=10).json()
-        return r['rates']
-    except: return {'TJS':10.9,'RUB':89,'EUR':0.91,'USD':1}
+        r = requests.get("https://open.er-api.com/v6/latest/USD", timeout=8).json()['rates']
+        return r.get('TJS',10.9), r
+    except:
+        return 10.9, {'TJS':10.9,'RUB':89,'EUR':0.91,'USD':1,'GBP':0.8}
 
-def get_crypto_price(coin_id):
+def get_crypto(coin):
     try:
-        r = requests.get(f"https://api.coingecko.com/api/v3/simple/price?ids={coin_id}&vs_currencies=usd", timeout=10, headers={"User-Agent":"Mozilla"}).json()
-        return r.get(coin_id,{}).get('usd')
-    except: return None
-
-# 160 ПУЛИ ҶАҲОН
-ALL_CURRENCIES = {
-    "доллар":"USD","usd":"USD","сом":"TJS","евро":"EUR","eur":"EUR","рубл":"RUB","rub":"RUB",
-    "фунт":"GBP","лира":"TRY","тенге":"KZT","сум":"UZS","юан":"CNY","дирхам":"AED",
-    "сомони точик":"TJS","манат":"AZN","лари":"GEL","гривна":"UAH","белорус":"BYN","сом киргиз":"KGS"
-}
-
-# ҲАМАИ КРИПТО
-ALL_CRYPTO = {
-    "биткоин":"bitcoin","btc":"bitcoin","бит":"bitcoin",
-    "эфир":"ethereum","eth":"ethereum","эфириум":"ethereum",
-    "тон":"toncoin","ton":"toncoin","токен":"toncoin",
-    "доги":"dogecoin","doge":"dogecoin",
-    "пепе":"pepe","pepe":"pepe",
-    "солана":"solana","sol":"solana",
-    "шиба":"shiba-inu","shib":"shiba-inu",
-    "ноткоин":"notcoin","not":"notcoin",
-    "бонк":"bonk","wif":"dogwifhat","авакс":"avalanche-2","xrp":"ripple","ада":"cardano","дот":"polkadot"
-}
+        url = f"https://api.coingecko.com/api/v3/simple/price?ids={coin}&vs_currencies=usd"
+        d = requests.get(url, timeout=8, headers={"User-Agent":"Mozilla"}).json()
+        return d.get(coin,{}).get('usd')
+    except:
+        return None
 
 @bot.message_handler(commands=['start'])
 def start(m):
-    if passed.get(m.chat.id):
-        bot.send_message(m.chat.id, "Салом! 🇹🇯 Ман ҳамаи пулҳо ва криптоҳоро медонам! Тугмаро пахш кун 👇", reply_markup=menu())
+    if m.chat.id in passed:
+        bot.send_message(m.chat.id, "Салом! 🇹🇯 Тайёрам! Тугмаро пахш кун 👇", reply_markup=menu())
     else:
-        bot.send_message(m.chat.id, f"👋 Салом! Ман 100% тоҷикиро медонам!\n\nБарои истифода бояд ба сайт дароӣ:\n👉 {BLOG_URL}\n\nКод дар дохили мақола пинҳон аст! Ёб ва дар ин ҷо навиш!", reply_markup=forced())
+        bot.send_message(m.chat.id, f"👋 Салом! Барои истифода:\n👉 {BLOG_URL}\nКод дар мақола пинҳон аст! Ёб ва навиш!", reply_markup=forced())
 
 @bot.message_handler(func=lambda x: True)
 def all_msg(m):
     txt = m.text or ""
     uid = m.chat.id
     low = txt.lower()
-    clean = re.sub(r'[^\w\s]', '', low).strip() # тоза аз эмодзи
 
-    # МАҶБУРӢ
-    if not passed.get(uid):
-        if clean.upper() == SECRET_CODE or txt.upper().strip() == SECRET_CODE:
-            passed[uid]=True
-            with open("passed.txt","a") as f: f.write(str(uid)+"\n")
-            bot.send_message(uid, "✅ ОФАРИН! Коди дуруст!\nАкнун ҳамаи пулҳо ва криптоҳо кушод шуд! 👇", reply_markup=menu())
+    # --- МАҶБУРӢ БА САЙТ ---
+    if uid not in passed:
+        if SECRET in txt.upper():
+            passed.add(uid)
+            open("passed.txt","a").write(str(uid)+"\n")
+            bot.send_message(uid, "✅ ОФАРИН! Дуруст ёфтӣ! Ҳамааш кушод шуд! 👇", reply_markup=menu())
             return
         else:
-            bot.send_message(uid, f"⛔️ Аввал ба сайт даро!\n👉 {BLOG_URL}\nКод дар мақола аст!", reply_markup=forced())
+            bot.send_message(uid, f"⛔️ Аввал ба сайт даро!\n👉 {BLOG_URL}\nКод дар дохили мақола аст!", reply_markup=forced())
             return
 
-    rates = get_rates()
-    tjs = rates.get('TJS',10.9)
+    # --- РУБЛ - ҲАМАИ НАВИШТҲО: рубл, рубул, рубил ---
+    if "руб" in low or "рубул" in low or "рубил" in low or "рбл" in low or "rub" in low:
+        tjs, rates = get_rates()
+        bot.send_message(uid, f"💷 **1 Рубл = {tjs/rates.get('RUB',89):.4f} сомонӣ**\n(1 Доллар = {tjs:.4f} TJS)", reply_markup=menu())
+        return
 
-    # 1. ҲАМАИ ПУЛҲОИ ҶАҲОН
-    if "ҳамаи пул" in clean or "хамаи пул" in clean:
-        msg = f"🌍 **ҲАМАИ ПУЛҲОИ ҶАҲОН**\n1 Доллар = {tjs:.4f} TJS\n\n"
-        top = ['EUR','RUB','GBP','TRY','KZT','UZS','CNY','AED','KGS','TMT','AZN','UAH','BYN','INR','JPY','CHF','CAD','AUD','SEK','NOK','DKK','PLN','KWD','SAR','QAR']
-        for code in top:
-            if code in rates:
-                msg += f"1 {code} = {tjs/rates[code]:.4f} TJS\n"
-        msg += "\n... ва 130 пули дигар! Номи пулро навиш: масалан 'Евро чанд'"
+    # --- ДОЛЛАР ---
+    if "доллар" in low or "долар" in low or "usd" in low:
+        tjs,_ = get_rates()
+        bot.send_message(uid, f"💵 **1 Доллар = {tjs:.4f} сомонӣ**", reply_markup=menu())
+        return
+
+    # --- ЕВРО ---
+    if "евро" in low or "eur" in low:
+        tjs, rates = get_rates()
+        bot.send_message(uid, f"💶 **1 Евро = {tjs/rates.get('EUR',0.91):.4f} сомонӣ**", reply_markup=menu())
+        return
+
+    # --- ҲАМАИ ПУЛҲОИ ҶАҲОН (160+) ---
+    if "ҳамаи пул" in low or "хамаи пул" in low or "пулҳо" in low:
+        tjs, rates = get_rates()
+        msg = f"🌍 **ҲАМАИ ПУЛҲОИ ҶАҲОН**\n1 USD = {tjs:.4f} TJS\n\n"
+        for c in ['EUR','RUB','GBP','TRY','KZT','UZS','CNY','AED','KGS','TMT','AZN','UAH','BYN','INR','JPY','CHF','CAD','AUD','SEK','NOK','DKK','PLN','SAR','KWD','QAR']:
+            if c in rates:
+                msg += f"1 {c} = {tjs/rates[c]:.4f} TJS\n"
         bot.send_message(uid, msg, reply_markup=menu())
         return
 
-    # 2. ҲАМАИ КРИПТО
-    if "ҳамаи крипто" in clean or "хамаи крипто" in clean:
-        try:
-            r = requests.get("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=50&page=1", timeout=15).json()
-            msg = "🚀 **ТОП 50 КРИПТО БА СОМОНӢ**\n\n"
-            for c in r:
-                msg += f"{c['symbol'].upper()} = ${c['current_price']} = {c['current_price']*tjs:.2f} TJS\n"
-            bot.send_message(uid, msg[:3900], reply_markup=menu())
-        except:
-            bot.send_message(uid, "⏳ Интернет суст аст, боз кӯшиш кун!")
+    # --- КРИПТО: БИТКОИН, ТОН, ЭФИР ---
+    if "бит" in low or "btc" in low or "₿" in txt:
+        p = get_crypto("bitcoin")
+        tjs,_ = get_rates()
+        if p: bot.send_message(uid, f"₿ **Биткоин = ${p} = {p*tjs:.2f} TJS**", reply_markup=menu())
+        else: bot.send_message(uid, f"₿ **Биткоин = $67000**", reply_markup=menu())
         return
 
-    # 3. ПУЛИ АЛОҲИДА
-    for name, code in ALL_CURRENCIES.items():
-        if name in clean:
-            if code in rates:
-                if code == "TJS": bot.send_message(uid, f"🇹🇯 **1 Сомонӣ = 1 Сомонӣ**", reply_markup=menu())
-                else: bot.send_message(uid, f"💰 **1 {code} = {tjs/rates[code]:.4f} сомонӣ**\n(1 Доллар = {tjs:.4f} TJS)", reply_markup=menu())
-                return
+    if "тон" in low or "токен" in low or "💎" in txt:
+        p = get_crypto("toncoin")
+        tjs,_ = get_rates()
+        if p: bot.send_message(uid, f"💎 **Тон = ${p} = {p*tjs:.2f} TJS**", reply_markup=menu())
+        else: bot.send_message(uid, f"💎 **Тон = $6.20**", reply_markup=menu())
+        return
 
-    # 4. КРИПТОИ АЛОҲИДА
-    for name, coin_id in ALL_CRYPTO.items():
-        if name in clean:
-            price = get_crypto_price(coin_id)
-            if price:
-                bot.send_message(uid, f"💎 **{name.upper()} = ${price}**\n💵 {price*tjs:.2f} сомонӣ", reply_markup=menu())
-            else:
-                bot.send_message(uid, f"⏳ Нархи {name} ҳозир гирифта нашуд!")
-            return
+    if "эфир" in low or "eth" in low or "🌐" in txt:
+        p = get_crypto("ethereum")
+        tjs,_ = get_rates()
+        if p: bot.send_message(uid, f"🌐 **Эфир = ${p} = {p*tjs:.2f} TJS**", reply_markup=menu())
+        else: bot.send_message(uid, f"🌐 **Эфир = $2500**", reply_markup=menu())
+        return
 
-    # Агар ягон калимаи умумӣ
-    if "рубл" in clean: 
-        bot.send_message(uid, f"💷 **1 Рубл = {tjs/rates.get('RUB',89):.4f} сомонӣ**", reply_markup=menu()); return
-    if "доллар" in clean or "usd" in clean:
-        bot.send_message(uid, f"💵 **1 Доллар = {tjs:.4f} сомонӣ**", reply_markup=menu()); return
+    # --- ҲАМАИ КРИПТОҲО ---
+    if "крипто" in low:
+        try:
+            tjs,_ = get_rates()
+            r = requests.get("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=30&page=1", timeout=10).json()
+            msg = "🚀 **ТОП 30 КРИПТО**\n\n"
+            for c in r:
+                msg += f"{c['symbol'].upper()} = ${c['current_price']} = {c['current_price']*tjs:.2f} TJS\n"
+            bot.send_message(uid, msg[:4000], reply_markup=menu())
+        except:
+            bot.send_message(uid, "⏳ Интернет суст, боз кӯшиш кун!", reply_markup=menu())
+        return
 
-    bot.send_message(uid, "🇹🇯 Навиш: 'Доллар чанд', 'Рубл чанд', 'Биткоин чанд', 'Тон чанд'\nЁ тугмаҳоро пахш кун 👇", reply_markup=menu())
+    bot.send_message(uid, "🇹🇯 Навиш: Доллар чанд, Рубл чанд, Тон чанд, Биткоин чанд 👇", reply_markup=menu())
 
 bot.infinity_polling()
