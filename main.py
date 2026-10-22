@@ -1,3 +1,4 @@
+
 import telebot, requests, re
 from bs4 import BeautifulSoup
 
@@ -5,62 +6,74 @@ TOKEN = "ТОКЕНАТРО_ИНҶО_ГУЗОР"
 BLOG_URL = "https://cryptotj-dushanbe.blogspot.com/2025/10/blog-post.html"
 bot = telebot.TeleBot(TOKEN)
 
-# Кӣ кодро дохил кард, дар хотир мемонад
-authorized = set()
+# ҚУЛФ
+unlocked = set()
 
 def get_code():
     try:
-        r = requests.get(BLOG_URL, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10)
-        text = BeautifulSoup(r.text, 'html.parser').get_text().upper()
-        codes = re.findall(r'(?:CRYPTO|TJ|DUSHANBE|CODE)\d+[A-Z0-9]*', text)
-        if codes: return codes[-1]
+        r = requests.get(BLOG_URL, headers={'User-Agent':'Mozilla/5.0'}, timeout=10)
+        t = BeautifulSoup(r.text, 'html.parser').get_text().upper()
+        c = re.findall(r'(?:CRYPTO|TJ|DUSHANBE|CODE)\d+[A-Z0-9]*', t)
+        if c: return c[-1]
     except: pass
-    return "CRYPTO2025"
+    return "TJ2026"
 
-def get_crypto_live():
+def get_crypto():
     try:
-        p = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana&vs_currencies=usd", timeout=10).json()
-        return f"₿ BTC: ${p['bitcoin']['usd']}\n♦️ ETH: ${p['ethereum']['usd']}\n◎ SOL: ${p['solana']['usd']}"
+        url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,the-open-network,tether&vs_currencies=usd"
+        d = requests.get(url, timeout=10).json()
+        btc = d.get('bitcoin',{}).get('usd', 81561)
+        eth = d.get('ethereum',{}).get('usd', 2441)
+        ton = d.get('the-open-network',{}).get('usd', 1.60)
+        return btc, eth, ton
     except:
-        return "₿ BTC: $82,817\n♦️ ETH: $2,441\n◎ SOL: $105"
+        return 81561, 2441, 1.60
+
+@bot.message_handler(commands=['start'])
+def start(m):
+    bot.send_message(m.chat.id, f"Салом! 👇\n\n🔒 Кодро ворид кун!\nСайт: {BLOG_URL}\n\nКод: {get_code()}")
 
 @bot.message_handler(func=lambda m: True)
-def handle(m):
-    chat_id = m.chat.id
-    txt = m.text.strip().upper()
-    code_now = get_code()
+def all_msg(m):
+    cid = m.chat.id
+    txt = m.text.strip()
+    up = txt.upper()
+    code = get_code()
 
-    # 1. Агар кодро дуруст нависад - иҷозат медиҳем
-    if txt == code_now:
-        authorized.add(chat_id)
-        bot.reply_to(m, f"✅ Коди {code_now} дуруст!\n\nҲоло метавонӣ пурсӣ:\n💵 Доллар чанд\n🇷🇺 Рубл чанд\n₿ Биткоин чанд")
-        return
-
-    # 2. Агар иҷозат надошта бошад - ҚУЛФ!
-    if chat_id not in authorized:
-        bot.reply_to(m, f"🔒 Аввал кодро ворид кун!\n\n👉 Коди имрӯза: {BLOG_URL}\n\nКодро инҷо навиш!")
+    # 1. КОД
+    if up == code:
+        unlocked.add(cid)
+        bot.reply_to(m, f"✅ Дуруст! {code}\n\nҲоло:\n💵 Доллар чанд\n💎 Тон чанд\n₿ Биткоин чанд\n🇷🇺 Рубл чанд")
         return
 
-    # 3. Агар иҷозат дошта бошад - қурбро медиҳем
-    if "ДОЛЛАР" in txt or "DOLLAR" in txt:
-        bot.reply_to(m, "💵 Доллар: 9.2261 TJS")
-        return
-    if "РУБЛ" in txt:
-        bot.reply_to(m, "🇷🇺 Рубл: 0.1126 TJS")
-        return
-    if "ЕВРО" in txt:
-        bot.reply_to(m, "🇪🇺 Евро: 10.3655 TJS")
-        return
-    if "ТЕНГЕ" in txt:
-        bot.reply_to(m, "🇰🇿 Тенге: 0.02057 TJS")
-        return
-    if "ДИРХАМ" in txt:
-        bot.reply_to(m, "🇦🇪 Дирхам: 2.5117 TJS")
-        return
-    if "БИТКОИН" in txt or "BTC" in txt or "КРИПТО" in txt:
-        bot.reply_to(m, f"{get_crypto_live()}")
+    # 2. ҚУЛФ
+    if cid not in unlocked:
+        bot.reply_to(m, f"🔒 Аввал код!\n👉 {BLOG_URL}\nКод: {code}")
         return
 
-    bot.reply_to(m, f"Навиш: Доллар чанд, Рубл чанд, Биткоин чанд\n\nКоди нав: {code_now}")
+    # 3. ҚУРБҲО
+    btc, eth, ton = get_crypto()
+    
+    if "ДОЛЛАР" in up:
+        bot.reply_to(m, "💵 1 Доллар = 9.2261 сомонӣ")
+    elif "ЕВРО" in up:
+        bot.reply_to(m, "🇪🇺 1 Евро = 10.3655 сомонӣ")
+    elif "РУБЛ" in up:
+        bot.reply_to(m, "🇷🇺 1 Рубл = 0.1126 сомонӣ")
+    elif "ДИРХАМ" in up:
+        bot.reply_to(m, "🇦🇪 1 Дирхам = 2.5117 сомонӣ")
+    elif "ТЕНГЕ" in up:
+        bot.reply_to(m, "🇰🇿 1 Тенге = 0.02057 сомонӣ")
+    elif "ТОН" in up or up == "TON":
+        som = ton * 9.2261
+        bot.reply_to(m, f"💎 Тон = ${ton} = {som:.2f} сомонӣ")
+    elif "БИТКОИН" in up or "BTC" in up:
+        som = btc * 9.2261
+        bot.reply_to(m, f"₿ Биткоин = ${btc} = {som:.0f} сомонӣ")
+    elif "ЭФИР" in up or "ETH" in up:
+        bot.reply_to(m, f"♦️ Эфир = ${eth}")
+    else:
+        bot.reply_to(m, "Навиш: Доллар чанд, Тон чанд, Биткоин чанд, Рубл чанд")
 
+print("Бот кор мекунад...")
 bot.infinity_polling()
