@@ -31,6 +31,8 @@ else:
         "NEAR":"near","OP":"optimism","SUI":"sui","APT":"aptos","STX":"stacks"
     }
 
+    HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+
     def footer(): return f"\n\n━━━━━━━━━━━━━━\n🌐 {SITE}\n💰 Обуна шавед!"
     def markup():
         m=telebot.types.InlineKeyboardMarkup()
@@ -40,7 +42,7 @@ else:
 
     def get_all_fiat():
         try:
-            r=requests.get("https://open.er-api.com/v6/latest/USD", timeout=15).json()
+            r=requests.get("https://open.er-api.com/v6/latest/USD", headers=HEADERS, timeout=15).json()
             rates=r.get('rates',{})
             conv={}
             for k,v in rates.items():
@@ -50,74 +52,91 @@ else:
         except: return FIAT_BASE
 
     def get_price(cid_or_symbol):
-        # 1. CoinGecko
-        try:
-            r=requests.get(f"https://api.coingecko.com/api/v3/simple/price?ids={cid_or_symbol}&vs_currencies=usd", timeout=8).json()
-            price=r.get(cid_or_symbol,{}).get('usd')
-            if price: 
-                print(f"CoinGecko ok: {cid_or_symbol} = {price}")
-                return price
-        except Exception as e:
-            print(f"CoinGecko fail: {e}")
+        symbol = cid_or_symbol.upper()
+        for s, c in CRYPTO_BASE.items():
+            if c == cid_or_symbol:
+                symbol = s
+                break
+        if symbol in ["USDT","USDC","DAI"]: return 1.0
 
-        # 2. Binance - асосӣ!
+        # 1. Coinbase - беҳтарин, ҳеҷ гоҳ банд намешавад!
         try:
-            symbol = cid_or_symbol.upper()
-            for s, c in CRYPTO_BASE.items():
-                if c == cid_or_symbol:
-                    symbol = s
-                    break
-            if symbol in ["USDT","USDC","DAI"]: return 1.0
+            url = f"https://api.coinbase.com/v2/prices/{symbol}-USD/spot"
+            r = requests.get(url, headers=HEADERS, timeout=8).json()
+            if 'data' in r and 'amount' in r['data']:
+                p = float(r['data']['amount'])
+                print(f"Coinbase OK {symbol}={p}")
+                return p
+        except Exception as e:
+            print(f"Coinbase fail {symbol}: {e}")
+
+        # 2. Binance бо User-Agent
+        try:
             url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}USDT"
-            r = requests.get(url, timeout=8).json()
+            r = requests.get(url, headers=HEADERS, timeout=8).json()
             if 'price' in r:
-                print(f"Binance ok: {symbol} = {r['price']}")
-                return float(r['price'])
+                p = float(r['price'])
+                print(f"Binance OK {symbol}={p}")
+                return p
         except Exception as e:
-            print(f"Binance fail: {e}")
+            print(f"Binance fail {symbol}: {e}")
 
-        # 3. CryptoCompare
+        # 3. CoinCap
         try:
-            symbol = cid_or_symbol.upper()
-            for s, c in CRYPTO_BASE.items():
-                if c == cid_or_symbol:
-                    symbol = s
-                    break
-            url = f"https://min-api.cryptocompare.com/data/price?fsym={symbol}&tsyms=USD"
-            r = requests.get(url, timeout=8).json()
-            if 'USD' in r:
-                print(f"CryptoCompare ok: {symbol} = {r['USD']}")
-                return float(r['USD'])
+            # id лозим
+            cid = CRYPTO_BASE.get(symbol, symbol.lower())
+            url = f"https://api.coincap.io/v2/assets/{cid}"
+            r = requests.get(url, headers=HEADERS, timeout=8).json()
+            if 'data' in r and 'priceUsd' in r['data']:
+                p = float(r['data']['priceUsd'])
+                print(f"CoinCap OK {symbol}={p}")
+                return p
         except Exception as e:
-            print(f"CryptoCompare fail: {e}")
+            print(f"CoinCap fail {symbol}: {e}")
+
+        # 4. CryptoCompare
+        try:
+            url = f"https://min-api.cryptocompare.com/data/price?fsym={symbol}&tsyms=USD"
+            r = requests.get(url, headers=HEADERS, timeout=8).json()
+            if 'USD' in r:
+                p = float(r['USD'])
+                print(f"CryptoCompare OK {symbol}={p}")
+                return p
+        except Exception as e:
+            print(f"CryptoCompare fail {symbol}: {e}")
+
+        # 5. CoinGecko охирин
+        try:
+            cid = CRYPTO_BASE.get(symbol, cid_or_symbol)
+            url = f"https://api.coingecko.com/api/v3/simple/price?ids={cid}&vs_currencies=usd"
+            r = requests.get(url, headers=HEADERS, timeout=8).json()
+            if cid in r and 'usd' in r[cid]:
+                p = float(r[cid]['usd'])
+                print(f"CoinGecko OK {symbol}={p}")
+                return p
+        except Exception as e:
+            print(f"CoinGecko fail {symbol}: {e}")
 
         return None
 
     def search_crypto(q):
-        # 1. Binance зуд
+        # Binance зуд
         try:
             sym = q.upper().strip()
-            if 2 <= len(sym) <= 5 and sym not in ["ЧАНД","СОМ","РУБЛ"]:
-                url = f"https://api.binance.com/api/v3/ticker/price?symbol={sym}USDT"
-                r = requests.get(url, timeout=5).json()
-                if 'price' in r:
-                    return sym, sym, float(r['price'])
+            if 2 <= len(sym) <= 5:
+                p = get_price(sym)
+                if p: return sym, sym, p
         except: pass
-
-        # 2. CoinGecko search
+        # CoinGecko search + price
         try:
-            res=requests.get(f"https://api.coingecko.com/api/v3/search?query={q}", timeout=10).json()
+            res=requests.get(f"https://api.coingecko.com/api/v3/search?query={q}", headers=HEADERS, timeout=10).json()
             coins=res.get('coins',[])
             if coins:
                 cid=coins[0]['id']
                 sym=coins[0]['symbol'].upper()
                 name=coins[0]['name']
                 price=get_price(cid)
-                if not price:
-                    try:
-                        r2=requests.get(f"https://api.binance.com/api/v3/ticker/price?symbol={sym}USDT", timeout=5).json()
-                        if 'price' in r2: price=float(r2['price'])
-                    except: pass
+                if not price: price=get_price(sym)
                 return sym,name,price
         except: pass
         return None,None,None
@@ -169,17 +188,14 @@ else:
 
             if "10 крипто" in low or "100 крипто" in low or "хамаи крипто" in low or "ҳамаи крипто" in low:
                 try:
-                    msg="💰 ТОП 20 КРИПТО (Live Binance):\n\n"
+                    msg="💰 ТОП 20 КРИПТО (Live):\n\n"
                     for s in list(CRYPTO_BASE.keys())[:20]:
-                        p=get_price(CRYPTO_BASE[s])
-                        if not p:
-                            # Кӯшиши мустақим бо символ
-                            try:
-                                r=requests.get(f"https://api.binance.com/api/v3/ticker/price?symbol={s}USDT", timeout=5).json()
-                                if 'price' in r: p=float(r['price'])
-                            except: pass
-                        msg+=f"• {s}: {p if p else 'банд'} $\n"
-                    msg+=f"\n🚀 Ҳамаро медонам: PEPE чанд, BONK чанд!{footer()}"
+                        p=get_price(s)
+                        if p:
+                            msg+=f"• {s}: {p:.4f} $\n"
+                        else:
+                            msg+=f"• {s}: ҳозир банд\n"
+                    msg+=f"\n🚀 Ҳамаро медонам!{footer()}"
                     bot.send_message(message.chat.id, msg, reply_markup=markup())
                 except Exception as e:
                     print(e)
@@ -214,17 +230,16 @@ else:
                 if code in rates:
                     bot.send_message(message.chat.id, f"💰 1 {code} = {rates[code]:.6f} TJS\n💵 100 {code} = {rates[code]*100:.2f} TJS{footer()}", reply_markup=markup())
                     return
-                if code in CRYPTO_BASE:
-                    p=get_price(CRYPTO_BASE[code])
+                if code in CRYPTO_BASE or len(code)>=2:
+                    p=get_price(code if code in CRYPTO_BASE else CRYPTO_BASE.get(code, code))
+                    if not p:
+                        p=get_price(code)
                     if p:
-                        bot.send_message(message.chat.id, f"🟡 {code}:\n🟢 {p} $\n🔴 {p*10.9:.2f} TJS{footer()}", reply_markup=markup())
-                    else:
-                        bot.send_message(message.chat.id, f"⏳ {code} ҳозир банд, дубора кӯшиш кун{footer()}", reply_markup=markup())
-                    return
-                if len(code)>=2:
+                        bot.send_message(message.chat.id, f"🟡 {code}:\n🟢 {p} $\n🔴 {p*10.9:.4f} TJS{footer()}", reply_markup=markup())
+                        return
                     sym,name,price=search_crypto(code.lower())
                     if price:
-                        bot.send_message(message.chat.id, f"🟡 {sym} ({name}):\n🟢 {price} $\n🔴 {price*10.9:.4f} TJS{footer()}", reply_markup=markup())
+                        bot.send_message(message.chat.id, f"🟡 {sym} ({name}):\n🟢 {price} $\n🔴 {price*10.9:.6f} TJS{footer()}", reply_markup=markup())
                         return
 
             clean=re.sub(r'чанд|чика|сколка|price|нарх|курс|пул', '', low).strip()
@@ -245,7 +260,7 @@ else:
 
     app = Flask(__name__)
     @app.route('/')
-    def home(): return "✅ Bot Live - 160+ FIAT + 100+ CRYPTO - Binance"
+    def home(): return "✅ Bot Live - Coinbase + Binance + CoinCap"
 
     def run_bot():
         while True:
