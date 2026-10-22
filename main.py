@@ -1,9 +1,15 @@
-import telebot
+import os
 import requests
 import threading
 from flask import Flask
+import telebot
 
-BOT_TOKEN = "ТОКЕНАТРО ИН ҶО ГУЗОР"
+# Токен аз Environment гирифта мешавад - дар код нест!
+BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
+if not BOT_TOKEN:
+    print("❌ BOT_TOKEN дар Environment нест!")
+    exit(1)
+
 bot = telebot.TeleBot(BOT_TOKEN)
 
 USD_TJS = 10.90
@@ -29,11 +35,12 @@ NAMES = {
 
 def footer():
     return "\n\n━━━━━━━━━━━━━━\n🌐 cryptotj.tj\n💰 Ба сайти асли мо обуна шавед!"
+
 def markup():
     m = telebot.types.InlineKeyboardMarkup(row_width=1)
     m.add(
-        telebot.types.InlineKeyboardButton("💰 Сомони асли - мо обуна шавед", url="https://t.me/CryptoTj"),
-        telebot.types.InlineKeyboardButton("🌐 Ба сайти асли мо", url="https://cryptotj.tj")
+        telebot.types.InlineKeyboardButton("💰 Сомони асли - обуна", url="https://t.me/CryptoTj"),
+        telebot.types.InlineKeyboardButton("🌐 cryptotj.tj", url="https://cryptotj.tj")
     )
     return m
 
@@ -46,12 +53,13 @@ def start(message):
     kb.add(telebot.types.KeyboardButton("AVAX"))
     kb.add(telebot.types.KeyboardButton("14 курс"), telebot.types.KeyboardButton("10 крипто"))
     kb.add(telebot.types.KeyboardButton("Сум чанд"))
-    bot.send_message(message.chat.id, "✅ Бот тайёр!\n10 крипто + 14 курс", reply_markup=kb)
+    bot.send_message(message.chat.id, "✅ Бот тайёр!\n10 крипто + 14 курс\nИнтихоб кун:", reply_markup=kb)
 
 @bot.message_handler(content_types=['text'])
 def all_text(message):
     txt = message.text.strip()
     up = txt.upper()
+
     if up in FIAT:
         rate = FIAT[up]
         name = NAMES.get(up, "")
@@ -61,6 +69,7 @@ def all_text(message):
             msg = f"💰 1 {up} ({name}) = {rate:.4f} TJS{footer()}"
         bot.send_message(message.chat.id, msg, reply_markup=markup())
         return
+
     if up in CRYPTO:
         try:
             cid = CRYPTO[up]
@@ -70,41 +79,50 @@ def all_text(message):
             rub = usd * USD_RUB
             msg = f"🟡 {up}:\n🟢 Доллар: {usd} $\n🔵 Рубл: {rub:,.0f} RUB\n🔴 Сомонӣ: {tjs:,.0f} TJS{footer()}"
             bot.send_message(message.chat.id, msg, reply_markup=markup())
-        except:
-            bot.send_message(message.chat.id, "API банд")
+        except Exception as e:
+            print(f"Error crypto {up}: {e}")
         return
+
     if "14 курс" in txt.lower():
-        full = "💱 14 КУРС:\n\n"
+        full = "💱 14 КУРС - Бонки Миллӣ:\n\n"
         for code, rate in FIAT.items():
             name = NAMES.get(code, "")
             if code == "UZS":
-                full += f"• 1 UZS ({name}) = {rate:.5f} TJS\n  1000 UZS = {rate*1000:.2f} TJS\n"
+                full += f"• 1 UZS ({name}) = {rate:.5f} TJS | 1000 = {rate*1000:.2f} TJS\n"
             else:
                 full += f"• 1 {code} ({name}) = {rate:.4f} TJS\n"
         full += footer()
         bot.send_message(message.chat.id, full, reply_markup=markup())
         return
+
     if "10 крипто" in txt.lower():
         try:
             ids = ",".join(CRYPTO.values())
             url = f"https://api.coingecko.com/api/v3/simple/price?ids={ids}&vs_currencies=usd"
             data = requests.get(url, timeout=15).json()
-            full = "💰 10 КРИПТО:\n\n"
+            full = "💰 10 КРИПТО - Нархи имрӯз:\n\n"
             for sym, cid in CRYPTO.items():
                 if cid in data:
                     full += f"• {sym}: {data[cid]['usd']} $\n"
             full += footer()
             bot.send_message(message.chat.id, full, reply_markup=markup())
-        except:
-            bot.send_message(message.chat.id, "API банд")
+        except Exception as e:
+            print(f"Error all crypto: {e}")
+        return
 
-# ===== ВЕБ-СЕРВЕР БАРОИ RENDER =====
+    if "сум" in txt.lower():
+        rate = FIAT["UZS"]
+        msg = f"💰 UZS (Сум):\n• 1 UZS = {rate:.5f} TJS\n• 1000 UZS = {rate*1000:.2f} TJS{footer()}"
+        bot.send_message(message.chat.id, msg, reply_markup=markup())
+
+# Веб-сервер барои Render
 app = Flask(__name__)
 @app.route('/')
 def home():
-    return "Bot is Live! 10 crypto + 14 kurs"
+    return "Bot Live! 10 crypto + 14 fiat + cryptotj.tj"
 
 def run_bot():
+    print("Bot polling started...")
     bot.infinity_polling()
 
 if __name__ == "__main__":
