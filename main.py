@@ -1,68 +1,75 @@
-import os, time, requests
-from flask import Flask
-from threading import Thread
+import telebot
+import requests
 
-SITE_URL = "https://cryptotj-dushanbe.blogspot.com"
-TOKEN = os.getenv("BOT_TOKEN")
-API = f"https://api.telegram.org/bot{TOKEN}"
+BOT_TOKEN = "ТОКЕНАТРО ИН ҶО ГУЗОР"
+bot = telebot.TeleBot(BOT_TOKEN)
 
-app = Flask(__name__)
-@app.route('/')
-def home(): return "Bot 14 kurs Alive!"
+USD_TJS = 10.90
+USD_RUB = 95.50
 
-CURRENCIES = {
-    'USD': 'Доллар', 'EUR': 'Евро', 'RUB': 'Рубл', 'GBP': 'Фунт',
-    'CNY': 'Юан', 'TRY': 'Лира', 'KZT': 'Тенге', 'UZS': 'Сум',
-    'KGS': 'Сом', 'JPY': 'Йен', 'CHF': 'Франк', 'AED': 'Дирхам',
-    'SAR': 'Риял', 'INR': 'Рупия'
+# 14 КУРС - НБТ (UZS ДУРУСТ!)
+FIAT = {
+    "USD": ("Доллар", 10.90),
+    "EUR": ("Евро", 11.85),
+    "RUB": ("Рубл", 0.115),
+    "GBP": ("Фунт", 12.34),
+    "TRY": ("Лира", 1.37),
+    "CHF": ("Франк", 11.17),
+    "AED": ("Дирхам", 2.51),
+    "SAR": ("Риял", 2.45),
+    "INR": ("Рупия", 0.097),
+    "KZT": ("Тенге", 0.022),
+    "CNY": ("Юан", 1.51),
+    "KGS": ("Сом", 0.124),
+    "TMT": ("Манат", 3.11),
+    "UZS": ("Сум", 0.000844),
 }
 
-def get_rates():
-    try:
-        r = requests.get("https://api.exchangerate-api.com/v4/latest/USD", timeout=10).json()
-        tjs = r['rates']['TJS']
-        res = {}
-        for c in CURRENCIES:
-            if c == 'USD': res[c] = tjs
-            else: res[c] = tjs / r['rates'].get(c, 1)
-        return res
-    except:
-        return {c: 10.9 for c in CURRENCIES}
+# 10 КРИПТО
+CRYPTO = {
+    "BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana",
+    "BNB": "binancecoin", "XRP": "ripple", "DOGE": "dogecoin",
+    "TON": "the-open-network", "USDT": "tether",
+    "TRX": "tron", "AVAX": "avalanche-2"
+}
 
-def send(chat_id, text):
-    kb = {"inline_keyboard": [[{"text": "🌐 Сомона - 14 курс", "url": SITE_URL}]]}
-    requests.post(f"{API}/sendMessage", json={"chat_id": chat_id, "text": text, "reply_markup": kb})
+def get_footer():
+    return "\n\n━━━━━━━━━━━━━━\n🌐 cryptotj.tj\n💰 Ба сайти асли мо обуна шавед!"
 
-def run_bot():
-    offset = 0
-    while True:
-        try:
-            data = requests.get(f"{API}/getUpdates?offset={offset}&timeout=30").json()
-            for upd in data.get("result", []):
-                offset = upd["update_id"] + 1
-                msg = upd.get("message", {})
-                chat_id = msg.get("chat", {}).get("id")
-                txt_in = msg.get("text","").lower()
-                if not chat_id: continue
-                k = get_rates()
+def markup():
+    m = telebot.types.InlineKeyboardMarkup(row_width=1)
+    m.add(
+        telebot.types.InlineKeyboardButton("💰 Сомони асли - мо обуна шавед", url="https://t.me/CryptoTj"),
+        telebot.types.InlineKeyboardButton("🌐 Ба сайти асли мо - cryptotj.tj", url="https://cryptotj.tj")
+    )
+    return m
 
-                found = None
-                for code, name in CURRENCIES.items():
-                    if code.lower() in txt_in or name.lower() in txt_in:
-                        found = code; break
+def get_14_kurs():
+    txt = "💱 14 КУРС - Бонки Миллӣ:\n\n"
+    for code,(nom,rate) in FIAT.items():
+        if code == "UZS":
+            txt += f"• 1 UZS ({nom}) = {rate:.5f} TJS\n  1000 UZS = {rate*1000:.2f} TJS\n"
+        else:
+            txt += f"• 1 {code} ({nom}) = {rate:.4f} TJS\n"
+    txt += get_footer()
+    return txt
 
-                if found:
-                    txt = f"💰 1 {found} ({CURRENCIES[found]}) = {k[found]:.4f} TJS\n1000 {found} = {k[found]*1000:.1f} TJS"
-                else:
-                    txt = "💱 КУРСИ 14 АРЗ:\n\n"
-                    for code, name in CURRENCIES.items():
-                        txt += f"• 1 {code} ({name}) = {k[code]:.4f} TJS\n"
-                
-                send(chat_id, txt)
-        except: time.sleep(5)
+@bot.message_handler(commands=['start'])
+def start(m):
+    kb = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=3)
+    kb.add(*[telebot.types.KeyboardButton(k) for k in CRYPTO.keys()])
+    kb.add(telebot.types.KeyboardButton("14 курс"), telebot.types.KeyboardButton("Сум чанд"))
+    bot.send_message(m.chat.id, "✅ Бот тайёр!\n10 крипто + 14 курс\nИнтихоб кун:", reply_markup=kb)
 
-def run_flask(): app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
+@bot.message_handler(func=lambda m: m.text.upper() in FIAT)
+def fiat_one(m):
+    code = m.text.upper()
+    nom, rate = FIAT[code]
+    if code == "UZS":
+        txt = f"💰 {code} ({nom}):\n• 1 UZS = {rate:.5f} TJS\n• 1000 UZS = {rate*1000:.2f} TJS"
+    else:
+        txt = f"💰 1 {code} ({nom}) = {rate:.4f} TJS"
+    txt += get_footer()
+    bot.send_message(m.chat.id, txt, reply_markup=markup())
 
-if __name__ == '__main__':
-    Thread(target=run_flask, daemon=True).start()
-    run_bot()
+@bot.message_handler(func=lambda m: m.text.upper
