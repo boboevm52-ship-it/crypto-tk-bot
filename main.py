@@ -1,161 +1,166 @@
-import os, re, time, threading, requests, telebot
+import os, re, time, threading, requests
 from flask import Flask
+import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 TOKEN = os.getenv("BOT_TOKEN")
 bot = telebot.TeleBot(TOKEN, threaded=False)
 app = Flask(__name__)
 
-CHANNEL = "@cryptotj_tj" # номи каналат
+CHANNEL = "@cryptotj_tj"
+BLOG_URL = "https://cryptotj-dushanbe.blogspot.com/2026/10/blog-post_22.html"
+SECRET_CODE = "CRYPTO2025"
 
-@app.route('/')
-def home(): return "CryptoTJ Full - Tajik + 160 fiat + 100 crypto + Force Sub"
+# Базаи одамоне ки кодро ёфтанд
+user_passed = {}
 
-# Базаи ибтидоӣ
-fiat_rates = {"USD":9.22, "TJS":1.0, "RUB":0.115, "EUR":11.85, "AED":2.97, "TRY":0.32, "UZS":0.00084, "KZT":0.022, "AFN":0.15, "CNY":1.51, "GBP":13.80, "JPY":0.073, "KRW":0.008, "AFN":0.15}
+fiat_rates = {"USD": 9.22, "TJS": 1.0, "RUB": 0.11, "EUR": 10.5}
 
 def get_fiat():
     try:
-        r=requests.get("https://api.exchangerate-api.com/v4/latest/USD", timeout=10).json()
-        if "rates" in r:
-            tjs=r["rates"].get("TJS",9.22)
-            for k in r["rates"]:
-                if k=="TJS": continue
-                fiat_rates[k]=tjs / r["rates"][k] if r["rates"][k]!=0 else fiat_rates.get(k,1)
-            print(f"Fiat loaded {len(fiat_rates)} coins")
-    except Exception as e: print(f"Fiat err {e}")
+        r = requests.get("https://api.exchangerate-api.com/v4/latest/USD", timeout=5).json()
+        return r.get("rates", {})
+    except:
+        return {}
 
-def get_crypto(code):
-    code=code.upper()
-    for url in [
-        f"https://api.mexc.com/api/v3/ticker/price?symbol={code}USDT",
-        f"https://api.bybit.com/v5/market/tickers?category=spot&symbol={code}USDT",
-    ]:
-        try:
-            r=requests.get(url, timeout=5).json()
-            if "price" in r: return float(r["price"]), "MEXC"
-            if r.get("result",{}).get("list"): return float(r["result"]["list"][0]["lastPrice"]), "Bybit"
-        except: pass
+def get_crypto_price(symbol):
     try:
-        r=requests.get(f"https://api.coinbase.com/v2/prices/{code}-USD/spot", timeout=5).json()
-        if "data" in r: return float(r["data"]["amount"]), "Coinbase"
-    except: pass
-    return None, None
+        # CoinGecko
+        ids = {"BTC":"bitcoin","ETH":"ethereum","BNB":"binancecoin","SOL":"solana","XRP":"ripple","DOGE":"dogecoin","TON":"the-open-network","USDT":"tether","TRX":"tron","ADA":"cardano","SHIB":"shiba-inu","AVAX":"avalanche-2","DOT":"polkadot","LINK":"chainlink","MATIC":"matic-network","LTC":"litecoin","UNI":"uniswap"}
+        coin_id = ids.get(symbol.upper(), symbol.lower())
+        r = requests.get(f"https://api.coingecko.com/api/v3/simple/price?ids={coin_id}&vs_currencies=usd", timeout=5).json()
+        return r[coin_id]["usd"]
+    except:
+        return None
 
-# --- МАЧБУРӢ ОБУНА ---
-def is_subscribed(uid):
+def check_sub(user_id):
     try:
-        m=bot.get_chat_member(CHANNEL, uid)
+        m = bot.get_chat_member(CHANNEL, user_id)
         return m.status in ['member','administrator','creator']
-    except Exception as e:
-        print(f"SUB ERROR: {e} -> Ботро дар канал админ кун!")
+    except:
         return False
 
-def sub_keyboard():
-    mk=InlineKeyboardMarkup()
-    mk.add(InlineKeyboardButton("📢 Обуна ба канал", url=f"https://t.me/{CHANNEL[1:]}"))
-    mk.add(InlineKeyboardButton("✅ Ман обуна шудам", callback_data="check"))
-    return mk
+def main_menu():
+    markup = InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        InlineKeyboardButton("💵 Сом чанд?", callback_data="fiat_USD"),
+        InlineKeyboardButton("💶 Евро чанд?", callback_data="fiat_EUR"),
+        InlineKeyboardButton("💷 Рубл чанд?", callback_data="fiat_RUB"),
+        InlineKeyboardButton("₿ Биткоин чанд?", callback_data="crypto_BTC"),
+        InlineKeyboardButton("Ξ Эфириум чанд?", callback_data="crypto_ETH"),
+        InlineKeyboardButton("💎 Тон чанд?", callback_data="crypto_TON"),
+        InlineKeyboardButton("🌐 Ҳамаи криптоҳо", callback_data="all_crypto"),
+        InlineKeyboardButton("🌍 Ҳамаи пулҳо", callback_data="all_fiat")
+    )
+    return markup
 
-# --- ЛУҒАТИ ЗӮРИ ТОҶИКӢ ---
-def find_code(txt):
-    tl = txt.lower().strip()
-    # салом
-    if tl in ["салом","салом алейкум","алейкум","hi","hello","привет","салам","salom"]:
-        return "SALOM"
-    tl = tl.replace("чанд","").replace("пул","").replace("курс","").replace("курби","").replace("нарх","").replace("?","").replace("!","").replace("сӯм","сум").strip()
+@app.route('/')
+def home():
+    return "CryptoTJ Full - Tajik Bot Ishlayapti!"
 
-    mp = {
-        "доллар":"USD","долар":"USD","бакс":"USD","доллари":"USD","долари":"USD","долларӣ":"USD","usd":"USD","dollar":"USD","долаp":"USD",
-        "евро":"EUR","йевро":"EUR","еврои":"EUR","eur":"EUR","euro":"EUR",
-        "рубл":"RUB","рубли":"RUB","руси":"RUB","рӯбл":"RUB","рубли руси":"RUB","rub":"RUB",
-        "сомон":"TJS","сомони":"TJS","сом":"TJS","соми":"TJS","сомонӣ":"TJS","точик":"TJS","тоҷик":"TJS","tjs":"TJS",
-        "сум":"UZS","суми узбек":"UZS","узбек":"UZS","узб":"UZS","uzs":"UZS",
-        "тенге":"KZT","танге":"KZT","қазоқ":"KZT","казок":"KZT","kzt":"KZT",
-        "дирхам":"AED","дирҳам":"AED","дирами":"AED","дубай":"AED","араб":"AED","аморот":"AED","аед":"AED","aed":"AED",
-        "лира":"TRY","турк":"TRY","туркия":"TRY","try":"TRY",
-        "афгон":"AFN","афғон":"AFN","afn":"AFN",
-        "юан":"CNY","хитои":"CNY","чинои":"CNY","cny":"CNY",
-        "йен":"JPY","япони":"JPY","jpy":"JPY",
-        "фунт":"GBP","англис":"GBP","gbp":"GBP",
-        "вон":"KRW","корея":"KRW","krw":"KRW",
-        # крипто
-        "биткоин":"BTC","биткойн":"BTC","биток":"BTC","бит":"BTC","btc":"BTC",
-        "эфириум":"ETH","эфир":"ETH","eth":"ETH",
-        "солана":"SOL","солано":"SOL","sol":"SOL",
-        "рипл":"XRP","xrp":"XRP","репла":"XRP",
-        "шиба":"SHIB","шибаину":"SHIB","shib":"SHIB",
-        "пепе":"PEPE","пеп":"PEPE","pepe":"PEPE","курбока":"PEPE",
-        "бонк":"BONK","bonk":"BONK",
-        "трон":"TRX","trx":"TRX",
-        "тон":"TON","тонкоин":"TON","ton":"TON",
-        "бнб":"BNB","бинанс":"BNB","bnb":"BNB",
-        "кардано":"ADA","ада":"ADA","ada":"ADA",
-        "дот":"DOT","полкадот":"DOT","dot":"DOT",
-        "лайт":"LTC","лайткоин":"LTC","ltc":"LTC",
-        "флоки":"FLOKI","floki":"FLOKI",
-        "тетеp":"USDT","юсдт":"USDT","usdt":"USDT","доллари крипто":"USDT",
-        "доги":"DOGE","догикоин":"DOGE","doge":"DOGE",
-        "линк":"LINK","чейнлинк":"LINK","link":"LINK",
-        "авакс":"AVAX","аваланч":"AVAX","avax":"AVAX",
-    }
-    # аввал калимаи дарозро санҷ
-    for k in sorted(mp.keys(), key=len, reverse=True):
-        if k in tl:
-            return mp[k]
-            
-    m=re.search(r'\b[A-Z]{2,5}\b', txt.upper())
-    if m: return m.group(0)
-    return None
+@bot.callback_query_handler(func=lambda c: True)
+def callbacks(call):
+    if call.data == "check_sub":
+        if not check_sub(call.from_user.id):
+            bot.answer_callback_query(call.id, "⛔️ Ту ҳанӯз обуна нашудаӣ!")
+            return
+        # обуна шуд - акнун ба блог фирист
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton("🔐 Ба сайти мо даро", url=BLOG_URL))
+        bot.send_message(call.message.chat.id, f"✅ Зӯр! Обуна шудӣ!\n\n🔐 Қадами 2:\nБа сайти мо даро ва КОДРО ёб:\n👉 {BLOG_URL}\n\nКоди имрӯз дар саҳифа навишта шудааст.\nКоди ёфтаатонро ин ҷо нависед:", reply_markup=markup)
+    
+    elif call.data.startswith("fiat_") or call.data.startswith("crypto_") or call.data.startswith("all_"):
+        if user_passed.get(call.from_user.id) != True:
+            markup = InlineKeyboardMarkup()
+            markup.add(InlineKeyboardButton("🔐 Кодро аз сайт ёб", url=BLOG_URL))
+            bot.send_message(call.message.chat.id, f"⛔️ Барои дидани нарх, аввал ба сайти мо даро:\n{BLOG_URL}\nва кодро ин ҷо навиш!", reply_markup=markup)
+            return
+        
+        if call.data.startswith("fiat_"):
+            cur = call.data.split("_")[1]
+            rates = get_fiat()
+            usd_tjs = fiat_rates["USD"]
+            if cur in rates:
+                # USD ба TJS
+                price_tjs = (1 / rates.get("TJS", 0.108)) * rates.get(cur, 1) if cur != "USD" else usd_tjs
+                # содда
+                bot.send_message(call.message.chat.id, f"💵 1 {cur} = {usd_tjs * rates.get(cur, 1):.2f} TJS\n\nБо CryptoTJ")
+            else:
+                bot.send_message(call.message.chat.id, f"💵 1 {cur} = {fiat_rates.get(cur, 'Дарёфт нашуд')} TJS")
+        elif call.data == "all_fiat":
+            txt = "🌍 Ҳамаи пулҳои ҷаҳон ба сомонӣ:\n\n"
+            rates = get_fiat()
+            for k in ["USD","EUR","RUB","CNY","KGS","KZT","UZS","TRY","GBP","AED"]:
+                txt += f"• 1 {k} = ... TJS\n"
+            txt += "\nНавиш: масалан 'доллар чанд' ё 'евро чанд'"
+            bot.send_message(call.message.chat.id, txt)
+        elif call.data == "all_crypto":
+            txt = "₿ Ҳамаи криптоҳо:\n\nBTC, ETH, BNB, SOL, XRP, DOGE, TON, USDT, TRX, ADA, SHIB, AVAX, DOT, LINK, MATIC, LTC, UNI ва 1000-тои дигар\n\nНавиш: 'биткоин чанд'"
+            bot.send_message(call.message.chat.id, txt)
+        else:
+            sym = call.data.split("_")[1]
+            price = get_crypto_price(sym)
+            if price:
+                tjs = price * fiat_rates["USD"]
+                bot.send_message(call.message.chat.id, f"₿ 1 {sym} = ${price} = {tjs:.2f} TJS")
 
 @bot.message_handler(commands=['start'])
 def start(m):
-    if not is_subscribed(m.from_user.id):
-        bot.send_message(m.chat.id, f"⛔ Барои дидани қурб, аввал ба канал обуна шав:\n{CHANNEL}", reply_markup=sub_keyboard())
+    markup = InlineKeyboardMarkup()
+    markup.add(InlineKeyboardButton("📢 Обуна ба канал", url=f"https://t.me/{CHANNEL[1:]}"))
+    markup.add(InlineKeyboardButton("✅ Ман обуна шудам", callback_data="check_sub"))
+    bot.send_message(m.chat.id, f"Салом {m.from_user.first_name}! 👋\n\nМан боти 100% тоҷикӣ ҳастам!\n\n💰 Ҳамаи пулҳои ҷаҳонро медонам\n₿ Ҳамаи криптоҳоро медонам\n\nБарои истифода аввал обуна шав:", reply_markup=markup)
+
+@bot.message_handler(func=lambda m: True)
+def all_messages(m):
+    text = m.text.lower().strip()
+    
+    # 1. Санҷиши код
+    if text.upper() == SECRET_CODE:
+        user_passed[m.from_user.id] = True
+        bot.send_message(m.chat.id, "✅ ОФАРИН! Коди дуруст!\n\nАкнун пурра дастрасӣ дорӣ! 👇", reply_markup=main_menu())
         return
-    bot.send_message(m.chat.id, "👋 Салом! Ман ҳамаи пулҳои ҷаҳонро бо тоҷикӣ мефаҳмам!\n\nНавиш:\n• доллар чанд\n• сом чанд\n• рубли руси чанд\n• дирхами дубай чанд\n• биткоин чанд\n• шиба чанд\n\nБлоги мо:\nhttps://cryptotj.blogspot.com")
 
-@bot.message_handler(commands=['help'])
-def help_cmd(m):
-    bot.send_message(m.chat.id, "🌍 160+ пул, 100+ крипто\n\nМисол:\nдоллар чанд\nевро чанд\nсом чанд\nсуми узбек чанд\nдирхами дубай чанд\nбиткоин чанд\nтон чанд\n\nhttps://cryptotj.blogspot.com")
+    # 2. Санҷиши обуна
+    if not check_sub(m.from_user.id):
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton("📢 Обуна ба канал", url=f"https://t.me/{CHANNEL[1:]}"))
+        markup.add(InlineKeyboardButton("✅ Ман обуна шудам", callback_data="check_sub"))
+        bot.send_message(m.chat.id, "⛔️ Аввал обуна шав, баъд нарх медиҳам:", reply_markup=markup)
+        return
 
-@bot.callback_query_handler(func=lambda c: c.data=="check")
-def chk(c):
-    if is_subscribed(c.from_user.id):
-        bot.edit_message_text("✅ Раҳмат! Обуна шудӣ! Акнун навиш: доллар чанд, сом чанд, биткоин чанд", c.message.chat.id, c.message.message_id)
+    # 3. Санҷиши блог
+    if user_passed.get(m.from_user.id) != True:
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton("🔐 Ба сайт даро ва код ёб", url=BLOG_URL))
+        bot.send_message(m.chat.id, f"🔐 Барои дидани нарх, ба сайти мо даро:\n👉 {BLOG_URL}\n\nКод дар саҳифа аст. Кодро ин ҷо навиш:", reply_markup=markup)
+        return
+
+    # 4. Агар ҳама корро карда бошад - ҷавоб деҳ
+    if "сом чанд" in text or "доллар" in text or "usd" in text:
+        bot.send_message(m.chat.id, f"💵 1 USD = {fiat_rates['USD']} TJS\n💶 1 EUR = 10.5 TJS\n💷 1 RUB = 0.11 TJS", reply_markup=main_menu())
+    elif "биткоин" in text or "btc" in text:
+        p = get_crypto_price("BTC")
+        bot.send_message(m.chat.id, f"₿ 1 BTC = ${p} = {p*fiat_rates['USD']:.0f} TJS")
+    elif "эфир" in text or "eth" in text:
+        p = get_crypto_price("ETH")
+        bot.send_message(m.chat.id, f"Ξ 1 ETH = ${p}")
+    elif "тон" in text or "ton" in text:
+        p = get_crypto_price("TON")
+        bot.send_message(m.chat.id, f"💎 1 TON = ${p}")
     else:
-        bot.answer_callback_query(c.id, "❌ Ҳоло обуна нашудаӣ! Аввал тугмаи Обуна-ро пахш кун", show_alert=True)
-
-@bot.message_handler(func=lambda x: True)
-def all_msg(m):
-    if not is_subscribed(m.from_user.id):
-        bot.send_message(m.chat.id, "⛔ Аввал обуна шав, баъд қурб медиҳам:", reply_markup=sub_keyboard())
-        return
-    code=find_code(m.text)
-    if code=="SALOM":
-        bot.send_message(m.chat.id, f"👋 Салом! 💵 1 USD = {fiat_rates['USD']:.2f} TJS\nНавиш: доллар чанд, сом чанд, биткоин чанд")
-        return
-    if not code:
-        bot.send_message(m.chat.id, "❓ Нафаҳмидам.\nНавиш: доллар чанд, сом чанд, биткоин чанд")
-        return
-    if code in fiat_rates:
-        if code=="TJS":
-            bot.send_message(m.chat.id, f"💵 1 TJS = 1.00 TJS\nhttps://cryptotj.blogspot.com")
-        else:
-            bot.send_message(m.chat.id, f"💵 1 {code} = {fiat_rates[code]:.4f} TJS\n≈ ${fiat_rates[code]/fiat_rates['USD']:.4f}\nhttps://cryptotj.blogspot.com")
-    else:
-        p,src=get_crypto(code)
-        if p:
-            bot.send_message(m.chat.id, f"🪙 {code} = ${p:.6f}\n≈ {p*fiat_rates['USD']:.2f} TJS\n({src})\nhttps://cryptotj.blogspot.com")
-        else:
-            bot.send_message(m.chat.id, f"❌ {code} ёфт нашуд.\nНавиш: доллар чанд, биткоин чанд")
+        # ҳамаи крипто ё пул
+        sym = re.findall(r'\b([A-Z]{2,5})\b', m.text.upper())
+        if sym:
+            p = get_crypto_price(sym[0])
+            if p:
+                bot.send_message(m.chat.id, f"₿ 1 {sym[0]} = ${p} = {p*fiat_rates['USD']:.2f} TJS")
+                return
+        bot.send_message(m.chat.id, "Навиш:\n• Сом чанд\n• Доллар чанд\n• Биткоин чанд\n• Евро чанд\n• Рубл чанд\n\nЁ номи ягон крипто: SOL, DOGE, TON", reply_markup=main_menu())
 
 def run_bot():
-    get_fiat()
-    while True:
-        try: bot.infinity_polling(timeout=60, long_polling_timeout=60)
-        except Exception as e: print(e); time.sleep(5)
+    bot.infinity_polling()
 
 if __name__ == "__main__":
-    threading.Thread(target=run_bot, daemon=True).start()
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT",10000)))
+    threading.Thread(target=run_bot).start()
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
