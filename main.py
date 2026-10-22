@@ -1,76 +1,41 @@
-import telebot
-import requests
+import telebot, requests, re
 from bs4 import BeautifulSoup
 
-TOKEN = "ТОКЕНИ_ХУДАТРО_ИНҶО"
-bot = telebot.TeleBot(TOKEN)
+bot = telebot.TeleBot("ТОКЕНАТ")
 
-def гирифтани_коди_нав():
+def коди_аз_сайт():
     try:
         url = "https://cryptotj-dushanbe.blogspot.com/2025/10/blog-post.html"
-        r = requests.get(url, timeout=10)
-        soup = BeautifulSoup(r.text, 'html.parser')
-        text = soup.get_text()
-        # Кодро аз текст меёбад - масалан CRYPTO2025
-        import re
-        codes = re.findall(r'CRYPTO\d+|DUSHANBE\d+', text)
-        if codes:
-            return codes[-1]  # охирин код
-        return None
+        html = requests.get(url, timeout=10).text
+        text = BeautifulSoup(html, 'html.parser').get_text()
+        # Ҳамаи кодҳои дар сайт бударо меёбад
+        codes = re.findall(r'[A-Z0-9]{5,15}', text)
+        # Охирин кодро мегирад
+        for c in reversed(codes):
+            if "CRYPTO" in c or "DUSHANBE" in c or "TJ" in c:
+                return c
+        return "CRYPTO2025"
     except:
-        return None
-
-RATES = {
-    "доллар": "🇺🇸 1 USD = 9.20 TJS",
-    "евро": "🇪🇺 1 EUR = 10.34 TJS",
-    "рубл": "🇷🇺 100 RUB = 11.22 TJS",
-    "тенге": "🇰🇿 1000 KZT = 20.51 TJS",
-    "сом": "🇰🇬 1 KGS = 0.105 TJS",
-    "сум": "🇺🇿 10000 UZS = 7.15 TJS",
-    "лира": "🇹🇷 1 TRY = 0.19 TJS",
-    "юан": "🇨🇳 1 CNY = 1.28 TJS",
-    "фунт": "🇬🇧 1 GBP = 12.10 TJS",
-    "дирхам": "🇦🇪 1 AED = 2.50 TJS",
-    "биткоин": "₿ 1 BTC = 625,600 TJS",
-    "эфир": "💎 1 ETH = 32,200 TJS",
-    "тезер": "💵 1 USDT = 9.20 TJS",
-    "сол": "◎ 1 SOL = 1,420 TJS",
-    "тон": "💎 1 TON = 45 TJS",
-    "доге": "🐶 1 DOGE = 1.15 TJS",
-    "шиба": "🐕 1M SHIB = 210 TJS",
-    "пепе": "🐸 1M PEPE = 85 TJS",
-    "бнб": "🔶 1 BNB = 5,500 TJS",
-    "трон": "🔴 1 TRX = 1.05 TJS",
-}
-
-@bot.message_handler(commands=['start'])
-def start(m):
-    bot.reply_to(m, "Салом! 👋\nНавиш: Рубл чанд? Биткоин чанд?\n\nКоди нав: /code")
-
-@bot.message_handler(commands=['code'])
-def code_cmd(m):
-    коди_нав = гирифтани_коди_нав()
-    if коди_нав:
-        bot.reply_to(m, f"✅ Коди НАВ аз сайт:\n\n`{коди_нав}`\n\nСайт: cryptotj-dushanbe.blogspot.com", parse_mode="Markdown")
-    else:
-        bot.reply_to(m, "⛔ Коди кӯҳна не! Коди НАВ:\nCRYPTO2025\n\nАз сайт ё: https://cryptotj-dushanbe.blogspot.com/2025/10/blog-post.html")
+        return "CRYPTO2025"
 
 @bot.message_handler(func=lambda m: True)
-def handle(m):
-    t = m.text.lower()
-    # Аввал код санҷ
-    if "crypto" in t or "dushanbe" in t:
-        код = гирифтани_коди_нав()
-        if t.strip().upper() == (код.upper() if код else "CRYPTO2025"):
-            bot.reply_to(m, f"✅ Код дуруст! Коди нав: {код}")
-        else:
-            bot.reply_to(m, f"⛔ Коди кӯҳна не! Коди НАВ: {код or 'CRYPTO2025'}")
-        return
+def auto(m):
+    text = m.text.strip().upper()
+    коди_дуруст = коди_аз_сайт().upper()
     
-    for k,v in RATES.items():
-        if k in t:
-            bot.reply_to(m, v)
+    if text == коди_дуруст:
+        bot.reply_to(m, f"✅ Дуруст! Коди нав фаъол: {коди_дуруст}\n\nНавиш: Доллар, Биткоин")
+    else:
+        # Агар код нодуруст бошад
+        if len(text) > 4:
+            bot.reply_to(m, f"⛔ Коди кӯҳна!\n\n✅ Коди НАВ ва ДУРУСТ:\n{коди_дуруст}\n\nАз сайт: cryptotj-dushanbe.blogspot.com")
             return
+        
+        # Қурби асъор
+        rates = {"ДОЛЛАР":"9.20","РУБЛ":"11.22","БИТКОИН":"625600"}
+        for k,v in rates.items():
+            if k in text:
+                bot.reply_to(m, f"{k}: {v} TJS")
+                return
 
-print("Бот автомат кор мекунад...")
 bot.infinity_polling()
