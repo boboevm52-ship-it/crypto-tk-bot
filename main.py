@@ -8,7 +8,7 @@ print(f"Token ok: {bool(BOT_TOKEN)}")
 if not BOT_TOKEN or ":" not in BOT_TOKEN:
     app = Flask(__name__)
     @app.route('/')
-    def home(): return "❌ BOT_TOKEN нест!"
+    def home(): return "BOT_TOKEN нест!"
     if __name__ == "__main__":
         app.run(host="0.0.0.0", port=10000)
 else:
@@ -19,127 +19,62 @@ else:
     except: pass
 
     SITE = "https://cryptotj.blogspot.com"
-    FIAT_BASE = {"USD":10.90,"EUR":11.85,"RUB":0.115,"GBP":12.34,"TRY":1.37,"CHF":11.17,"AED":2.51,"SAR":2.45,"INR":0.097,"KZT":0.022,"CNY":1.51,"KGS":0.124,"TMT":3.11,"UZS":0.000844,"JPY":0.073,"KRW":0.0081,"AFN":0.15,"AZN":6.41,"UAH":0.26}
-    CRYPTO_BASE = {
-        "BTC":"bitcoin","ETH":"ethereum","BNB":"binancecoin","XRP":"ripple","SOL":"solana",
-        "DOGE":"dogecoin","TON":"the-open-network","ADA":"cardano","AVAX":"avalanche-2","SHIB":"shiba-inu",
-        "DOT":"polkadot","TRX":"tron","LINK":"chainlink","MATIC":"matic-network","LTC":"litecoin",
-        "BCH":"bitcoin-cash","UNI":"uniswap","XLM":"stellar","ATOM":"cosmos","ETC":"ethereum-classic",
-        "PEPE":"pepe","BONK":"bonk","NOT":"notcoin","PI":"pi-network","FLOKI":"floki",
-        "WIF":"dogwifcoin","WLD":"worldcoin","RENDER":"render-token","FET":"fetch-ai","INJ":"injective-protocol",
-        "USDT":"tether","USDC":"usd-coin","DAI":"dai","AAVE":"aave","ARB":"arbitrum",
-        "NEAR":"near","OP":"optimism","SUI":"sui","APT":"aptos","STX":"stacks"
-    }
+    
+    # 160+ ПУЛИ ҶАҲОН
+    FIAT_BASE = {"USD":10.90,"EUR":11.85,"RUB":0.115,"GBP":12.34,"TRY":1.37,"CHF":11.17,"AED":2.51,"SAR":2.45,"INR":0.097,"KZT":0.022,"CNY":1.51,"KGS":0.124,"TMT":3.11,"UZS":0.000844,"JPY":0.073,"KRW":0.0081,"AFN":0.15,"AZN":6.41,"UAH":0.26,"BYN":3.33,"GEL":4.05,"AMD":0.028,"MDL":0.61,"BRL":2.15,"CAD":8.05,"AUD":7.15,"SGD":8.25}
 
-    HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+    # 100+ КРИПТО
+    CRYPTO_BASE = {
+        "BTC":"bitcoin","ETH":"ethereum","BNB":"binancecoin","XRP":"ripple","SOL":"solana","DOGE":"dogecoin","TON":"the-open-network","ADA":"cardano","AVAX":"avalanche-2","SHIB":"shiba-inu","DOT":"polkadot","TRX":"tron","LINK":"chainlink","MATIC":"matic-network","LTC":"litecoin","BCH":"bitcoin-cash","UNI":"uniswap","XLM":"stellar","ATOM":"cosmos","ETC":"ethereum-classic","PEPE":"pepe","BONK":"bonk","NOT":"notcoin","PI":"pi-network","FLOKI":"floki","WIF":"dogwifcoin","WLD":"worldcoin","RENDER":"render-token","FET":"fetch-ai","INJ":"injective-protocol","USDT":"tether","USDC":"usd-coin","DAI":"dai","AAVE":"aave","ARB":"arbitrum","NEAR":"near","OP":"optimism","SUI":"sui","APT":"aptos","STX":"stacks","FIL":"filecoin","HBAR":"hedera","IMX":"immutable-x","MKR":"maker","TAO":"bittensor","RNDR":"render-token","GRT":"the-graph","RUNE":"thorchain","STRK":"starknet","SEI":"sei-network","JUP":"jupiter-exchange-solana","PYTH":"pyth-network","ENA":"ethena","W":"wormhole","TIA":"celestia","ONDO":"ondo-finance","PEOPLE":"constitutiondao","ENS":"ethereum-name-service","LDO":"lido-dao","FLOW":"flow","EGLD":"elrond-erd-2","SAND":"the-sandbox","MANA":"decentraland","AXS":"axie-infinity","CHZ":"chiliz","GALA":"gala","ENJ":"enjincoin","ZEC":"zcash","XMR":"monero","DASH":"dash","XTZ":"tezos","EOS":"eos","KAVA":"kava","KLAY":"klay-token","MINA":"mina-protocol","ROSE":"oasis-network","ONE":"harmony","ZIL":"zilliqa","QTUM":"qtum","BAT":"basic-attention-token","COMP":"compound-governance-token","SNX":"havven","1INCH":"1inch","CRV":"curve-dao-token","SUSHI":"sushi","YFI":"yearn-finance","BAL":"balancer","CAKE":"pancakeswap-token","ALGO":"algorand","VET":"vechain","ICP":"internet-computer","THETA":"theta-token","FTM":"fantom"
+    }
+    
+    H = {"User-Agent":"Mozilla/5.0"}
 
     def footer(): return f"\n\n━━━━━━━━━━━━━━\n🌐 {SITE}\n💰 Обуна шавед!"
     def markup():
         m=telebot.types.InlineKeyboardMarkup()
         m.add(telebot.types.InlineKeyboardButton("💰 Канали мо", url=SITE))
-        m.add(telebot.types.InlineKeyboardButton("🌐 Сайти аслӣ", url=SITE))
         return m
 
     def get_all_fiat():
         try:
-            r=requests.get("https://open.er-api.com/v6/latest/USD", headers=HEADERS, timeout=15).json()
+            r=requests.get("https://open.er-api.com/v6/latest/USD", headers=H, timeout=15).json()
             rates=r.get('rates',{})
             conv={}
             for k,v in rates.items():
-                if v>0: conv[k]=10.9/v
+                if v>0: conv[k]=round(10.9/v, 6)
             for k,v in FIAT_BASE.items(): conv[k]=v
             return conv
         except: return FIAT_BASE
 
-    def get_price(cid_or_symbol):
-        symbol = cid_or_symbol.upper()
-        for s, c in CRYPTO_BASE.items():
-            if c == cid_or_symbol:
-                symbol = s
-                break
-        if symbol in ["USDT","USDC","DAI"]: return 1.0
+    def get_price(sym):
+        sym=sym.upper().strip()
+        for s,c in CRYPTO_BASE.items():
+            if c==sym.lower(): sym=s
+        if sym in ["USDT","USDC","DAI","FDUSD"]: return 1.0
 
-        # 1. Coinbase - беҳтарин, ҳеҷ гоҳ банд намешавад!
+        # 1. MEXC - беҳтарин барои PEPE BONK
         try:
-            url = f"https://api.coinbase.com/v2/prices/{symbol}-USD/spot"
-            r = requests.get(url, headers=HEADERS, timeout=8).json()
-            if 'data' in r and 'amount' in r['data']:
-                p = float(r['data']['amount'])
-                print(f"Coinbase OK {symbol}={p}")
-                return p
-        except Exception as e:
-            print(f"Coinbase fail {symbol}: {e}")
-
-        # 2. Binance бо User-Agent
+            r=requests.get(f"https://api.mexc.com/api/v3/ticker/price?symbol={sym}USDT", headers=H, timeout=5).json()
+            if 'price' in r: return float(r['price'])
+        except: pass
+        # 2. Bybit
         try:
-            url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}USDT"
-            r = requests.get(url, headers=HEADERS, timeout=8).json()
-            if 'price' in r:
-                p = float(r['price'])
-                print(f"Binance OK {symbol}={p}")
-                return p
-        except Exception as e:
-            print(f"Binance fail {symbol}: {e}")
-
-        # 3. CoinCap
+            r=requests.get(f"https://api.bybit.com/v5/market/tickers?category=spot&symbol={sym}USDT", headers=H, timeout=5).json()
+            lst=r.get('result',{}).get('list',[])
+            if lst and lst[0].get('lastPrice'): return float(lst[0]['lastPrice'])
+        except: pass
+        # 3. Coinbase
         try:
-            # id лозим
-            cid = CRYPTO_BASE.get(symbol, symbol.lower())
-            url = f"https://api.coincap.io/v2/assets/{cid}"
-            r = requests.get(url, headers=HEADERS, timeout=8).json()
-            if 'data' in r and 'priceUsd' in r['data']:
-                p = float(r['data']['priceUsd'])
-                print(f"CoinCap OK {symbol}={p}")
-                return p
-        except Exception as e:
-            print(f"CoinCap fail {symbol}: {e}")
-
-        # 4. CryptoCompare
+            r=requests.get(f"https://api.coinbase.com/v2/prices/{sym}-USD/spot", headers=H, timeout=5).json()
+            if 'data' in r and 'amount' in r['data']: return float(r['data']['amount'])
+        except: pass
+        # 4. Binance
         try:
-            url = f"https://min-api.cryptocompare.com/data/price?fsym={symbol}&tsyms=USD"
-            r = requests.get(url, headers=HEADERS, timeout=8).json()
-            if 'USD' in r:
-                p = float(r['USD'])
-                print(f"CryptoCompare OK {symbol}={p}")
-                return p
-        except Exception as e:
-            print(f"CryptoCompare fail {symbol}: {e}")
-
-        # 5. CoinGecko охирин
-        try:
-            cid = CRYPTO_BASE.get(symbol, cid_or_symbol)
-            url = f"https://api.coingecko.com/api/v3/simple/price?ids={cid}&vs_currencies=usd"
-            r = requests.get(url, headers=HEADERS, timeout=8).json()
-            if cid in r and 'usd' in r[cid]:
-                p = float(r[cid]['usd'])
-                print(f"CoinGecko OK {symbol}={p}")
-                return p
-        except Exception as e:
-            print(f"CoinGecko fail {symbol}: {e}")
-
+            r=requests.get(f"https://api.binance.com/api/v3/ticker/price?symbol={sym}USDT", headers=H, timeout=5).json()
+            if 'price' in r: return float(r['price'])
+        except: pass
         return None
-
-    def search_crypto(q):
-        # Binance зуд
-        try:
-            sym = q.upper().strip()
-            if 2 <= len(sym) <= 5:
-                p = get_price(sym)
-                if p: return sym, sym, p
-        except: pass
-        # CoinGecko search + price
-        try:
-            res=requests.get(f"https://api.coingecko.com/api/v3/search?query={q}", headers=HEADERS, timeout=10).json()
-            coins=res.get('coins',[])
-            if coins:
-                cid=coins[0]['id']
-                sym=coins[0]['symbol'].upper()
-                name=coins[0]['name']
-                price=get_price(cid)
-                if not price: price=get_price(sym)
-                return sym,name,price
-        except: pass
-        return None,None,None
 
     def find_code(t):
         tl=t.lower()
@@ -152,7 +87,7 @@ else:
         if "сум" in tl or "uzs" in tl: return "UZS"
         if "тенге" in tl or "kzt" in tl: return "KZT"
         if "афгон" in tl or "afn" in tl: return "AFN"
-        if "биткоин" in tl or "btc" in tl or "bitcoin" in tl: return "BTC"
+        if "биткоин" in tl or "btc" in tl: return "BTC"
         if "эфир" in tl: return "ETH"
         if "доге" in tl or "doge" in tl: return "DOGE"
         if "тон" in tl: return "TON"
@@ -160,8 +95,6 @@ else:
         if "солана" in tl or "sol" in tl: return "SOL"
         if "трон" in tl or "trx" in tl: return "TRX"
         if "тетер" in tl or "usdt" in tl: return "USDT"
-        if "бнб" in tl or "bnb" in tl: return "BNB"
-        if "авакс" in tl or "avax" in tl: return "AVAX"
         if "шиба" in tl or "shib" in tl: return "SHIB"
         if "пепе" in tl or "pepe" in tl: return "PEPE"
         if "бонк" in tl or "bonk" in tl: return "BONK"
@@ -176,7 +109,7 @@ else:
         kb.add(telebot.types.KeyboardButton("Сом чанд"),telebot.types.KeyboardButton("Рубл чанд"),telebot.types.KeyboardButton("Доллар чанд"))
         kb.add(telebot.types.KeyboardButton("BTC"),telebot.types.KeyboardButton("ETH"),telebot.types.KeyboardButton("PEPE"))
         kb.add(telebot.types.KeyboardButton("14 курс"),telebot.types.KeyboardButton("160 пул"),telebot.types.KeyboardButton("100 крипто"))
-        bot.send_message(message.chat.id, f"✅ Тайёр! 160 пул + 100 крипто!\n🌐 {SITE}", reply_markup=kb)
+        bot.send_message(message.chat.id, f"✅ Тайёр! 160+ пул + 100+ крипто!\n\n💰 Сом чанд - курси сомонӣ\n🌍 160 пул - ҳамаи пули ҷаҳон\n💎 100 крипто - ҳамаи крипто\n\n🌐 {SITE}", reply_markup=kb)
 
     @bot.message_handler(content_types=['text'])
     def text_handler(message):
@@ -186,39 +119,67 @@ else:
             code=find_code(txt)
             print(f"📩 {txt} -> {code}")
 
-            if "10 крипто" in low or "100 крипто" in low or "хамаи крипто" in low or "ҳамаи крипто" in low:
-                try:
-                    msg="💰 ТОП 20 КРИПТО (Live):\n\n"
-                    for s in list(CRYPTO_BASE.keys())[:20]:
-                        p=get_price(s)
-                        if p:
-                            msg+=f"• {s}: {p:.4f} $\n"
-                        else:
-                            msg+=f"• {s}: ҳозир банд\n"
-                    msg+=f"\n🚀 Ҳамаро медонам!{footer()}"
-                    bot.send_message(message.chat.id, msg, reply_markup=markup())
-                except Exception as e:
-                    print(e)
-                    bot.send_message(message.chat.id, f"⏳ Бандаст{footer()}", reply_markup=markup())
-                return
-
-            if code=="USD_SPECIAL" or "сом чанд" in low:
-                rates=get_all_fiat()
-                bot.send_message(message.chat.id, f"💰 1 USD = {rates.get('USD',10.9):.2f} TJS\n💶 1 EUR = {rates.get('EUR',11.85):.2f} TJS\n💴 1 RUB = {rates.get('RUB',0.115):.4f} TJS{footer()}", reply_markup=markup())
+            if "100 крипто" in low or "хамаи крипто" in low or "ҳамаи крипто" in low:
+                bot.send_message(message.chat.id, "⏳ 100 крипто ҷамъоварӣ... 15 сония сабр кун!")
+                msg1="💰 100 КРИПТО - ҚИСМИ 1/4:\n\n"
+                msg2="💰 100 КРИПТО - ҚИСМИ 2/4:\n\n"
+                msg3="💰 100 КРИПТО - ҚИСМИ 3/4:\n\n"
+                msg4="💰 100 КРИПТО - ҚИСМИ 4/4:\n\n"
+                keys=list(CRYPTO_BASE.keys())
+                for i, s in enumerate(keys[:25]):
+                    p=get_price(s)
+                    if p:
+                        if p<0.01: msg1+=f"• {s}: {p:.8f} $\n"
+                        else: msg1+=f"• {s}: {p:.4f} $\n"
+                for s in keys[25:50]:
+                    p=get_price(s)
+                    if p:
+                        if p<0.01: msg2+=f"• {s}: {p:.8f} $\n"
+                        else: msg2+=f"• {s}: {p:.4f} $\n"
+                for s in keys[50:75]:
+                    p=get_price(s)
+                    if p:
+                        if p<0.01: msg3+=f"• {s}: {p:.8f} $\n"
+                        else: msg3+=f"• {s}: {p:.4f} $\n"
+                for s in keys[75:100]:
+                    p=get_price(s)
+                    if p:
+                        if p<0.01: msg4+=f"• {s}: {p:.8f} $\n"
+                        else: msg4+=f"• {s}: {p:.4f} $\n"
+                
+                bot.send_message(message.chat.id, msg1+footer(), reply_markup=markup())
+                bot.send_message(message.chat.id, msg2+footer(), reply_markup=markup())
+                bot.send_message(message.chat.id, msg3+footer(), reply_markup=markup())
+                bot.send_message(message.chat.id, msg4+footer(), reply_markup=markup())
                 return
 
             if "160 пул" in low or "хамаи пул" in low:
                 rates=get_all_fiat()
-                msg="🌍 160+ ПУЛИ ҶАҲОН (40-то):\n\n"
-                for k,v in list(sorted(rates.items()))[:40]:
-                    msg+=f"• 1 {k} = {v:.4f} TJS\n"
-                msg+=f"\n...ҳамагӣ {len(rates)} пул!{footer()}"
-                bot.send_message(message.chat.id, msg, reply_markup=markup())
+                # 3 қисм мекунем чунки Telegram 4096 ҳарф қабул мекунад
+                sorted_rates=sorted(rates.items())
+                msg1="🌍 160 ПУЛ - ҚИСМИ 1/3:\n\n"
+                msg2="🌍 160 ПУЛ - ҚИСМИ 2/3:\n\n"
+                msg3="🌍 160 ПУЛ - ҚИСМИ 3/3:\n\n"
+                for k,v in sorted_rates[:60]:
+                    msg1+=f"• 1 {k} = {v:.4f} TJS\n"
+                for k,v in sorted_rates[60:120]:
+                    msg2+=f"• 1 {k} = {v:.4f} TJS\n"
+                for k,v in sorted_rates[120:]:
+                    msg3+=f"• 1 {k} = {v:.4f} TJS\n"
+                
+                bot.send_message(message.chat.id, msg1+footer(), reply_markup=markup())
+                bot.send_message(message.chat.id, msg2+footer(), reply_markup=markup())
+                bot.send_message(message.chat.id, msg3+footer(), reply_markup=markup())
                 return
 
-            if "курс" in low and "крипто" not in low:
+            if code=="USD_SPECIAL" or "сом чанд" in low:
                 rates=get_all_fiat()
-                msg="💱 14 КУРС:\n\n"
+                bot.send_message(message.chat.id, f"💰 1 USD = {rates.get('USD',10.9):.2f} TJS\n💶 1 EUR = {rates.get('EUR',11.85):.2f} TJS\n💴 1 RUB = {rates.get('RUB',0.115):.4f} TJS\n💷 1 GBP = {rates.get('GBP',12.34):.4f} TJS{footer()}", reply_markup=markup())
+                return
+
+            if "14 курс" in low or "курс" in low and "крипто" not in low and "пул" not in low:
+                rates=get_all_fiat()
+                msg="💱 14 КУРСИ АСОСӢ:\n\n"
                 for k in ["USD","EUR","RUB","GBP","TRY","JPY","KRW","AFN","AZN","KZT","UZS","CNY","AED","SAR"]:
                     msg+=f"• 1 {k} = {rates.get(k,0):.4f} TJS\n"
                 msg+=footer()
@@ -230,28 +191,14 @@ else:
                 if code in rates:
                     bot.send_message(message.chat.id, f"💰 1 {code} = {rates[code]:.6f} TJS\n💵 100 {code} = {rates[code]*100:.2f} TJS{footer()}", reply_markup=markup())
                     return
-                if code in CRYPTO_BASE or len(code)>=2:
-                    p=get_price(code if code in CRYPTO_BASE else CRYPTO_BASE.get(code, code))
-                    if not p:
-                        p=get_price(code)
-                    if p:
-                        bot.send_message(message.chat.id, f"🟡 {code}:\n🟢 {p} $\n🔴 {p*10.9:.4f} TJS{footer()}", reply_markup=markup())
-                        return
-                    sym,name,price=search_crypto(code.lower())
-                    if price:
-                        bot.send_message(message.chat.id, f"🟡 {sym} ({name}):\n🟢 {price} $\n🔴 {price*10.9:.6f} TJS{footer()}", reply_markup=markup())
-                        return
-
-            clean=re.sub(r'чанд|чика|сколка|price|нарх|курс|пул', '', low).strip()
-            clean=re.sub(r'[^a-zA-Z0-9]', '', clean).strip()
-            if len(clean)>=2:
-                sym,name,price=search_crypto(clean)
-                if price:
-                    bot.send_message(message.chat.id, f"🟡 {sym} ({name}):\n🟢 {price:.8f} $\n🔴 {price*10.9:.4f} TJS{footer()}", reply_markup=markup())
+                p=get_price(code)
+                if p:
+                    if p<0.01: bot.send_message(message.chat.id, f"🟡 {code}:\n🟢 {p:.10f} $\n🔴 {p*10.9:.10f} TJS{footer()}", reply_markup=markup())
+                    else: bot.send_message(message.chat.id, f"🟡 {code}:\n🟢 {p:.6f} $\n🔴 {p*10.9:.4f} TJS{footer()}", reply_markup=markup())
                     return
 
             rates=get_all_fiat()
-            bot.send_message(message.chat.id, f"💱 1 USD = {rates.get('USD',10.9):.2f} TJS\nНавиш: Сом чанд, Рубл чанд, PEPE чанд{footer()}", reply_markup=markup())
+            bot.send_message(message.chat.id, f"💱 1 USD = {rates.get('USD',10.9):.2f} TJS\nНавиш: Сом чанд, Рубл чанд, BTC, PEPE чанд{footer()}", reply_markup=markup())
 
         except Exception as e:
             print(f"Error: {e}")
@@ -260,12 +207,12 @@ else:
 
     app = Flask(__name__)
     @app.route('/')
-    def home(): return "✅ Bot Live - Coinbase + Binance + CoinCap"
+    def home(): return "✅ Bot Live - 160 FIAT + 100 CRYPTO - MEXC+Bybit"
 
     def run_bot():
         while True:
             try:
-                print("🚀 Polling...")
+                print("🚀 Polling started...")
                 bot.infinity_polling(skip_pending=True, timeout=60, long_polling_timeout=60)
             except Exception as e:
                 print(f"Polling error: {e}")
