@@ -1,7 +1,9 @@
 import telebot
 import requests
+import threading
+from flask import Flask
 
-BOT_TOKEN = "ТОКЕНАТРО ГУЗОР"
+BOT_TOKEN = "ТОКЕНАТРО ИН ҶО ГУЗОР"
 bot = telebot.TeleBot(BOT_TOKEN)
 
 USD_TJS = 10.90
@@ -13,14 +15,12 @@ FIAT = {
     "INR": 0.097, "KZT": 0.022, "CNY": 1.51, "KGS": 0.124,
     "TMT": 3.11, "UZS": 0.000844
 }
-
 CRYPTO = {
     "BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana",
     "BNB": "binancecoin", "XRP": "ripple", "DOGE": "dogecoin",
     "TON": "the-open-network", "USDT": "tether",
     "TRX": "tron", "AVAX": "avalanche-2"
 }
-
 NAMES = {
     "USD":"Доллар","EUR":"Евро","RUB":"Рубл","GBP":"Фунт",
     "TRY":"Лира","CHF":"Франк","AED":"Дирхам","SAR":"Риял",
@@ -29,7 +29,6 @@ NAMES = {
 
 def footer():
     return "\n\n━━━━━━━━━━━━━━\n🌐 cryptotj.tj\n💰 Ба сайти асли мо обуна шавед!"
-
 def markup():
     m = telebot.types.InlineKeyboardMarkup(row_width=1)
     m.add(
@@ -41,20 +40,18 @@ def markup():
 @bot.message_handler(commands=['start'])
 def start(message):
     kb = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=3)
-    # 10 КРИПТО - ТУГМАҲО
     kb.add(telebot.types.KeyboardButton("BTC"), telebot.types.KeyboardButton("ETH"), telebot.types.KeyboardButton("SOL"))
     kb.add(telebot.types.KeyboardButton("BNB"), telebot.types.KeyboardButton("XRP"), telebot.types.KeyboardButton("DOGE"))
     kb.add(telebot.types.KeyboardButton("TON"), telebot.types.KeyboardButton("USDT"), telebot.types.KeyboardButton("TRX"))
     kb.add(telebot.types.KeyboardButton("AVAX"))
     kb.add(telebot.types.KeyboardButton("14 курс"), telebot.types.KeyboardButton("10 крипто"))
     kb.add(telebot.types.KeyboardButton("Сум чанд"))
-    bot.send_message(message.chat.id, "✅ Бот тайёр!\n10 крипто + 14 курс\nИнтихоб кун:", reply_markup=kb)
+    bot.send_message(message.chat.id, "✅ Бот тайёр!\n10 крипто + 14 курс", reply_markup=kb)
 
 @bot.message_handler(content_types=['text'])
 def all_text(message):
     txt = message.text.strip()
     up = txt.upper()
-
     if up in FIAT:
         rate = FIAT[up]
         name = NAMES.get(up, "")
@@ -64,23 +61,20 @@ def all_text(message):
             msg = f"💰 1 {up} ({name}) = {rate:.4f} TJS{footer()}"
         bot.send_message(message.chat.id, msg, reply_markup=markup())
         return
-
     if up in CRYPTO:
         try:
             cid = CRYPTO[up]
             url = f"https://api.coingecko.com/api/v3/simple/price?ids={cid}&vs_currencies=usd"
-            data = requests.get(url, timeout=15).json()
-            usd = data[cid]['usd']
+            usd = requests.get(url, timeout=15).json()[cid]['usd']
             tjs = usd * USD_TJS
             rub = usd * USD_RUB
             msg = f"🟡 {up}:\n🟢 Доллар: {usd} $\n🔵 Рубл: {rub:,.0f} RUB\n🔴 Сомонӣ: {tjs:,.0f} TJS{footer()}"
             bot.send_message(message.chat.id, msg, reply_markup=markup())
-        except Exception as e:
-            bot.send_message(message.chat.id, f"Хато: {e}\nТакрор кун{footer()}", reply_markup=markup())
+        except:
+            bot.send_message(message.chat.id, "API банд")
         return
-
     if "14 курс" in txt.lower():
-        full = "💱 14 КУРС - Бонки Миллӣ:\n\n"
+        full = "💱 14 КУРС:\n\n"
         for code, rate in FIAT.items():
             name = NAMES.get(code, "")
             if code == "UZS":
@@ -90,21 +84,29 @@ def all_text(message):
         full += footer()
         bot.send_message(message.chat.id, full, reply_markup=markup())
         return
-
     if "10 крипто" in txt.lower():
         try:
             ids = ",".join(CRYPTO.values())
             url = f"https://api.coingecko.com/api/v3/simple/price?ids={ids}&vs_currencies=usd"
             data = requests.get(url, timeout=15).json()
-            full = "💰 10 КРИПТО - Нархи имрӯз:\n\n"
+            full = "💰 10 КРИПТО:\n\n"
             for sym, cid in CRYPTO.items():
                 if cid in data:
-                    usd = data[cid]['usd']
-                    full += f"• {sym}: {usd} $\n"
+                    full += f"• {sym}: {data[cid]['usd']} $\n"
             full += footer()
             bot.send_message(message.chat.id, full, reply_markup=markup())
         except:
-            bot.send_message(message.chat.id, "API банд, такрор кун")
-        return
+            bot.send_message(message.chat.id, "API банд")
 
-   
+# ===== ВЕБ-СЕРВЕР БАРОИ RENDER =====
+app = Flask(__name__)
+@app.route('/')
+def home():
+    return "Bot is Live! 10 crypto + 14 kurs"
+
+def run_bot():
+    bot.infinity_polling()
+
+if __name__ == "__main__":
+    threading.Thread(target=run_bot, daemon=True).start()
+    app.run(host="0.0.0.0", port=10000)
