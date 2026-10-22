@@ -4,7 +4,6 @@ import telebot
 
 BOT_TOKEN = os.getenv("BOT_TOKEN","").strip()
 bot = telebot.TeleBot(BOT_TOKEN, threaded=False)
-
 try:
  requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook?drop_pending_updates=true",timeout=10)
  time.sleep(1)
@@ -23,6 +22,16 @@ def markup():
  m.add(telebot.types.InlineKeyboardButton("💰 Ба канали мо обуна шавед",url=CHANNEL),telebot.types.InlineKeyboardButton("🌐 Сайти асли мо",url=SITE))
  return m
 
+def get_usd_price(cid):
+ try:
+  r=requests.get(f"https://api.coingecko.com/api/v3/simple/price?ids={cid}&vs_currencies=usd",timeout=20).json()
+  return r[cid]['usd']
+ except:
+  try: # Захира
+   r=requests.get(f"https://api.binance.com/api/v3/ticker/price?symbol={cid.upper()}USDT",timeout=10).json()
+   return float(r['price'])
+  except: return None
+
 @bot.message_handler(commands=['start'])
 def start(message):
  kb=telebot.types.ReplyKeyboardMarkup(resize_keyboard=True,row_width=3)
@@ -31,37 +40,56 @@ def start(message):
  kb.add(telebot.types.KeyboardButton("TON"),telebot.types.KeyboardButton("USDT"),telebot.types.KeyboardButton("TRX"))
  kb.add(telebot.types.KeyboardButton("AVAX"))
  kb.add(telebot.types.KeyboardButton("14 курс"),telebot.types.KeyboardButton("10 крипто"))
- kb.add(telebot.types.KeyboardButton("Биткоин чанд"))
- bot.send_message(message.chat.id,f"✅ Тайёр! 14 курс + 10 крипто\n🌐 {SITE}\nНавиш: Биткоин чанд",reply_markup=kb)
+ kb.add(telebot.types.KeyboardButton("Биткоин чанд"),telebot.types.KeyboardButton("Тон чанд"))
+ bot.send_message(message.chat.id,f"✅ Тайёр! 14 курс + 10 крипто\n🌐 {SITE}",reply_markup=kb)
 
 @bot.message_handler(content_types=['text'])
 def all_text(message):
  low=message.text.lower().strip()
  up=message.text.upper().strip()
- if "биткоин" in low or "btc" in low: up="BTC"
- elif "эфир" in low or "eth" in low: up="ETH"
+ original=up
+
+ # Точики
+ if "биткоин" in low: up="BTC"
+ elif "эфир" in low: up="ETH"
+ elif "тон" in low: up="TON"
+ elif "рипл" in low or "xrp" in low: up="XRP"
+ elif "сол" in low and len(low)<6: up="SOL"
+ elif "доги" in low: up="DOGE"
+ elif "бнб" in low: up="BNB"
+ elif "авакс" in low: up="AVAX"
+ elif "трон" in low: up="TRX"
  elif "доллар" in low: up="USD"
  elif "евро" in low: up="EUR"
  elif "рубл" in low: up="RUB"
  elif "сум" in low: up="UZS"
+
  if up in FIAT:
   r=FIAT[up]
   msg=f"💰 1 {up} = {r:.4f} TJS{footer()}" if up!="UZS" else f"💰 1000 UZS = {r*1000:.2f} TJS{footer()}"
   bot.send_message(message.chat.id,msg,reply_markup=markup()); return
+
  if up in CRYPTO:
-  try:
-   usd=requests.get(f"https://api.coingecko.com/api/v3/simple/price?ids={CRYPTO[up]}&vs_currencies=usd",timeout=15).json()[CRYPTO[up]]['usd']
-   bot.send_message(message.chat.id,f"🟡 {up}:\n🟢 {usd} $\n🔵 {usd*RUB:,.0f} RUB\n🔴 {usd*TJS:,.0f} TJS{footer()}",reply_markup=markup())
-  except: pass; return
+  usd=get_usd_price(CRYPTO[up])
+  if usd:
+   bot.send_message(message.chat.id,f"🟡 {up}:\n🟢 Доллар: {usd} $\n🔵 Рубл: {usd*RUB:,.0f} RUB\n🔴 Сомонӣ: {usd*TJS:,.0f} TJS{footer()}",reply_markup=markup())
+  else:
+   bot.send_message(message.chat.id,f"🟡 {up} ҳозир дастрас нест, боз 10 сония баъд санҷ!{footer()}",reply_markup=markup())
+  return
+
  if "курс" in low:
   txt="💱 14 КУРС:\n\n"+"\n".join([f"• 1 {k} = {v:.4f} TJS" for k,v in FIAT.items()])+footer()
   bot.send_message(message.chat.id,txt,reply_markup=markup()); return
+
  if "крипто" in low:
   try:
-   data=requests.get(f"https://api.coingecko.com/api/v3/simple/price?ids={','.join(CRYPTO.values())}&vs_currencies=usd",timeout=15).json()
-   txt="💰 10 КРИПТО:\n\n"+"\n".join([f"• {s}: {data[c]['usd']} $" for s,c in CRYPTO.items() if c in data])+footer()
+   ids=",".join(CRYPTO.values())
+   data=requests.get(f"https://api.coingecko.com/api/v3/simple/price?ids={ids}&vs_currencies=usd",timeout=20).json()
+   txt="💰 10 КРИПТО:\n\n"+"\n".join([f"• {s}: {data.get(c,{}).get('usd','-')} $" for s,c in CRYPTO.items()])+footer()
    bot.send_message(message.chat.id,txt,reply_markup=markup())
-  except: pass
+  except Exception as e:
+   bot.send_message(message.chat.id,f"Хатои API, боз санҷ! {e}"+footer())
+  return
 
 app=Flask(__name__)
 @app.route('/')
