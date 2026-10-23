@@ -1,5 +1,6 @@
 import telebot, os, threading, requests
 from flask import Flask
+from datetime import datetime
 
 TOKEN = os.environ.get("BOT_TOKEN", "ТОКЕНАТРО-ИН-ҶО-ГУЗОР")
 bot = telebot.TeleBot(TOKEN)
@@ -62,21 +63,23 @@ def get_crypto_price(sym):
 @bot.message_handler(commands=['start'])
 def s(m):
     rates = get_fiat_rates()
-    bot.send_message(m.chat.id, f"👋 CryptoTj AUTO 10+10 LIVE\n\n💵 Доллар: {rates['USD'][1]}\n🇷🇺 Рубл: {rates['RUB'][1]} = 1000={round(rates['RUB'][1]*1000,1)} TJS\n🇪🇺 Евро: {rates['EUR'][1]}\n\nҲама курс авто аз интернет!{AD}", reply_markup=kb())
+    vaqt = datetime.now().strftime("%H:%M:%S %d.%m")
+    bot.send_message(m.chat.id, f"👋 CryptoTj AUTO 10+10 LIVE\n\n💵 Доллар: {rates['USD'][1]}\n🇷🇺 Рубл: {rates['RUB'][1]} = 1000={round(rates['RUB'][1]*1000,1)} TJS\n🇪🇺 Евро: {rates['EUR'][1]}\n⏰ {vaqt}\n\nҲама курс авто аз интернет!{AD}", reply_markup=kb())
 
 @bot.message_handler(func=lambda x: True)
 def all_h(m):
     t = m.text
     rates = get_fiat_rates()
+    vaqt = datetime.now().strftime("%H:%M:%S %d.%m")
     for k,v in rates.items():
         if v[2].split()[1] in t:
             extra = f"\n🔴 1000 = {round(v[1]*1000,1)} TJS" if k=="RUB" else ""
-            bot.send_message(m.chat.id, f"{v[2]} AUTO\nХарид: {v[0]}\nФурӯш: {v[1]}{extra}\n♻️ Авто аз интернет{AD}", reply_markup=kb())
+            bot.send_message(m.chat.id, f"{v[2]} AUTO\nХарид: {v[0]}\nФурӯш: {v[1]}{extra}\n⏰ {vaqt}\n♻️ Манбаъ: open.er-api.com{AD}", reply_markup=kb())
             return
     for s_name in ["BTC","ETH","TON","SOL","DOGE","XRP","BNB","TRX","USDT","PI"]:
         if s_name in t:
             p = get_crypto_price(s_name)
-            bot.send_message(m.chat.id, f"₿ {s_name}/USDT: ${p}\n♻️ AUTO LIVE{AD}", reply_markup=kb())
+            bot.send_message(m.chat.id, f"₿ {s_name}/USDT: ${p}\n⏰ {vaqt}\n♻️ Манбаъ: Binance LIVE{AD}", reply_markup=kb())
             return
     bot.send_message(m.chat.id, f"🌍 LIVE: https://cryptotj-dushanbe.blogspot.com/{AD}", reply_markup=kb())
 
