@@ -1,7 +1,10 @@
-import telebot, requests, re
+import telebot, requests, re, os
 from bs4 import BeautifulSoup
 
-TOKEN = "8253409959:AAE...TOKEN_I_ASLIRA_INJO_GUZOR"
+TOKEN = os.environ.get("TOKEN")
+if not TOKEN:
+    TOKEN = "8253409959:AAE_TOKEN_I_KHATOGI_DORA"
+
 bot = telebot.TeleBot(TOKEN)
 
 BLOG_URL = "https://cryptotj-dushanbe.blogspot.com/2025/10/blog-post.html"
@@ -22,7 +25,7 @@ def get_crypto():
         return requests.get(url, timeout=10).json()
     except: return {}
 
-FOOTER = "\n\n━━━━━━━━━━━━━━\n🔥 Коди нав + хабарҳо:\n👉 https://cryptotj-dushanbe.blogspot.com/\n📢 @CryptoTj_Dushanbe"
+FOOTER = "\n\n━━━━━━━━━━━━━━\n🔥 Коди нав:\n👉 https://cryptotj-dushanbe.blogspot.com/\n📢 @CryptoTj_Dushanbe"
 
 @bot.message_handler(func=lambda m: m.text and "Доллар чанд" in m.text)
 def p1(m): bot.send_message(m.chat.id, f"💵 Доллар = {USD_TJS} сомонӣ{FOOTER}")
@@ -109,4 +112,5 @@ def last(m):
     else:
         bot.send_message(m.chat.id, f"❌ Коди кӯҳна! Нав: {real}\n{BLOG_URL}{FOOTER}")
 
+print("Bot started...")
 bot.infinity_polling()
