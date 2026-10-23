@@ -1,7 +1,7 @@
 import telebot, requests, re
 from bs4 import BeautifulSoup
 
-TOKEN = "8253409959:AAE... TOKENИ АСЛИИ ХУДРО ИНҶО ГУЗОР"
+TOKEN = "8253409959:AAE...TOKEN_I_ASLIRA_INJO_GUZOR"
 bot = telebot.TeleBot(TOKEN)
 
 BLOG_URL = "https://cryptotj-dushanbe.blogspot.com/2025/10/blog-post.html"
@@ -35,7 +35,7 @@ def p4(m): bot.send_message(m.chat.id, f"🇰🇬 Сом = 0.105 сомонӣ{FO
 @bot.message_handler(func=lambda m: m.text and "Тенге чанд" in m.text)
 def p5(m): bot.send_message(m.chat.id, f"🇰🇿 Тенге = 0.018 сомонӣ{FOOTER}")
 @bot.message_handler(func=lambda m: m.text and "Сум чанд" in m.text)
-def p6(m): bot.send_message(m.chat.id, f"🇺🇿 Сӯм = 0.72 сомонӣ / 1000{FOOTER}")
+def p6(m): bot.send_message(m.chat.id, f"🇺🇿 Сӯм = 0.72 / 1000{FOOTER}")
 @bot.message_handler(func=lambda m: m.text and "Юан чанд" in m.text)
 def p7(m): bot.send_message(m.chat.id, f"🇨🇳 Юан = 1.29 сомонӣ{FOOTER}")
 @bot.message_handler(func=lambda m: m.text and "Лира чанд" in m.text)
@@ -48,7 +48,7 @@ def p10(m): bot.send_message(m.chat.id, f"🇬🇧 Фунт = 12.02 сомонӣ
 @bot.message_handler(func=lambda m: m.text and "Биткоин чанд" in m.text)
 def c1(m):
     c=get_crypto(); p=c.get('bitcoin',{}).get('usd',0)
-    bot.send_message(m.chat.id, f"₿ Биткоин = ${p} = {p*USD_TJS:.1f}с{FOOTER}")
+    bot.send_message(m.chat.id, f"₿ Биткоин = ${p}{FOOTER}")
 @bot.message_handler(func=lambda m: m.text and "Эфир чанд" in m.text)
 def c2(m):
     c=get_crypto(); p=c.get('ethereum',{}).get('usd',0)
