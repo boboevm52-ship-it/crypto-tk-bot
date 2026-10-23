@@ -1,81 +1,100 @@
-import telebot, requests, re, time
-from bs4 import BeautifulSoup
+import telebot, requests
 
-TOKEN = "ТОКЕНАТРО_ИНҶО_ГУЗОР"
-BLOG_URL = "https://cryptotj-dushanbe.blogspot.com/2025/10/blog-post.html"
+TOKEN = "TOKEN-и худро инҷо гузор"
 bot = telebot.TeleBot(TOKEN)
 
-# cid : вақти то кай кушода аст
-unlocked = {}
+# Қурби доллар ба сомонӣ - аз Бонки Миллӣ 23.10.2026
+USD_TJS = 9.2261
 
-def get_code():
+def get_currencies():
     try:
-        r = requests.get(BLOG_URL, headers={'User-Agent':'Mozilla/5.0'}, timeout=10)
-        t = BeautifulSoup(r.text, 'html.parser').get_text().upper()
-        c = re.findall(r'(?:CRYPTO|TJ|DUSHANBE|CODE)\d+[A-Z0-9]*', t)
-        if c: return c[-1]
-    except: pass
-    return "TJ2026"
+        # Қурбҳои ҷаҳон ба доллар
+        r = requests.get("https://api.exchangerate-api.com/v4/latest/USD", timeout=10).json()
+        rates = r['rates']
+        # 10 пули машҳур ба сомонӣ
+        data = {
+            "🇺🇸 Доллар": rates['TJS'] if 'TJS' in rates else 9.2261,
+            "🇪🇺 Евро": rates['TJS']/rates['EUR'] if 'EUR' in rates else 10.3655,
+            "🇷🇺 Рубл": 0.1131,
+            "🇰🇬 Сом": 0.105,
+            "🇰🇿 Тенге": 0.018,
+            "🇺🇿 Сӯм": 0.00072,
+            "🇨🇳 Юан": 1.29,
+            "🇹🇷 Лира": 0.27,
+            "🇦🇪 Дирҳам": 2.51,
+            "🇬🇧 Фунт": 12.02
+        }
+        return data
+    except:
+        return {
+            "🇺🇸 Доллар": 9.2261, "🇪🇺 Евро": 10.3655, "🇷🇺 Рубл": 0.1131,
+            "🇰🇬 Сом": 0.105, "🇰🇿 Тенге": 0.018, "🇺🇿 Сӯм": 0.00072,
+            "🇨🇳 Юан": 1.29, "🇹🇷 Лира": 0.27, "🇦🇪 Дирҳам": 2.51, "🇬🇧 Фунт": 12.02
+        }
 
 def get_crypto():
     try:
-        url = "https://api.binance.com/api/v3/ticker/price?symbols=%5B%22BTCUSDT%22,%22ETHUSDT%22,%22TONUSDT%22%5D"
-        data = requests.get(url, timeout=8).json()
-        btc = eth = ton = 0
-        for item in data:
-            if item['symbol'] == 'BTCUSDT': btc = float(item['price'])
-            if item['symbol'] == 'ETHUSDT': eth = float(item['price'])
-            if item['symbol'] == 'TONUSDT': ton = float(item['price'])
-        if btc > 0: return btc, eth, ton
-    except: pass
-    return 81561.0, 2441.0, 1.60
+        url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,the-open-network,tether,binancecoin,solana,tron,dogecoin,cardano,ripple&vs_currencies=usd"
+        r = requests.get(url, timeout=10).json()
+        return {
+            "₿ Биткоин": r.get('bitcoin',{}).get('usd',0),
+            "🌐 Эфириум": r.get('ethereum',{}).get('usd',0),
+            "💎 Тон": r.get('the-open-network',{}).get('usd',0),
+            "💵 USDT": r.get('tether',{}).get('usd',0),
+            "🟡 BNB": r.get('binancecoin',{}).get('usd',0),
+            "☀️ Solana": r.get('solana',{}).get('usd',0),
+            "🔴 Tron": r.get('tron',{}).get('usd',0),
+            "🐶 Dogecoin": r.get('dogecoin',{}).get('usd',0),
+            "🔵 Cardano": r.get('cardano',{}).get('usd',0),
+            "✖️ XRP": r.get('ripple',{}).get('usd',0),
+        }
+    except:
+        return {}
 
-@bot.message_handler(commands=['start', 'stsrt'])
-def start(m):
-    code = get_code()
-    bot.send_message(m.chat.id, f"Салом! 👇\n\n🔒 Кодро ворид кун (1 соат эътибор дорад)!\nСайт: {BLOG_URL}\nКод: {code}")
+FOOTER = "\n\n👉 Бо сайти мо обуна шавед:\nhttps://cryptotj-dushanbe.blogspot.com/"
+
+@bot.message_handler(func=lambda m: m.text and "Доллар чанд" in m.text)
+def dollar(m):
+    bot.send_message(m.chat.id, f"💵 1 Доллар = {USD_TJS} сомонӣ{FOOTER}")
+
+@bot.message_handler(func=lambda m: m.text and "Рубл чанд" in m.text)
+def rubl(m):
+    bot.send_message(m.chat.id, f"🇷🇺 1 Рубл = 0.1131 сомонӣ{FOOTER}")
+
+@bot.message_handler(func=lambda m: m.text and "Тон чанд" in m.text)
+def ton(m):
+    c = get_crypto()
+    ton_usd = c.get("💎 Тон", 0)
+    bot.send_message(m.chat.id, f"💎 Тон = ${ton_usd} = {ton_usd*USD_TJS:.2f} сомонӣ{FOOTER}")
+
+@bot.message_handler(func=lambda m: m.text and "Эфир чанд" in m.text)
+def eth(m):
+    c = get_crypto()
+    eth_usd = c.get("🌐 Эфириум", 0)
+    bot.send_message(m.chat.id, f"🌐 Эфир = ${eth_usd} = {eth_usd*USD_TJS:.2f} сомонӣ{FOOTER}")
+
+@bot.message_handler(func=lambda m: m.text and "Хамаи пулхо" in m.text)
+def all_money(m):
+    cur = get_currencies()
+    txt = "🌍 10 пули ҷаҳон ба сомонӣ:\n\n"
+    for k,v in cur.items():
+        txt += f"{k} = {v} сомонӣ\n"
+    txt += FOOTER
+    bot.send_message(m.chat.id, txt)
+
+@bot.message_handler(func=lambda m: m.text and "Хамаи криптохо" in m.text)
+def all_crypto(m):
+    c = get_crypto()
+    txt = "🚀 10 криптои машҳур:\n\n"
+    for k,v in c.items():
+        txt += f"{k} = ${v}\n"
+    txt += "\nБа сомонӣ ҳисоб кардан хоҳӣ? Нархро ба 9.22 зарб зан."
+    txt += FOOTER
+    bot.send_message(m.chat.id, txt)
 
 @bot.message_handler(func=lambda m: True)
-def all_msg(m):
-    cid = m.chat.id
-    up = m.text.upper()
-    code = get_code()
-    now = time.time()
+def other(m):
+    bot.send_message(m.chat.id, f"Салом! Тугмаҳоро пахш кун, ман қурбро мегӯям.{FOOTER}")
 
-    # 1. КОДРО ЗАД?
-    if up == code or code in up:
-        unlocked[cid] = now + 3600  # 3600 сония = 1 соат
-        bot.reply_to(m, f"✅ Дуруст! {code}\n\n⏰ 1 соат кушода шуд!\nТо {time.strftime('%H:%M', time.localtime(now+3600))} метавонӣ пурсӣ:\n💵 Доллар чанд\n💎 Тон чанд\n₿ Биткоин чанд")
-        return
-
-    # 2. САНҶИШИ 1 СОАТ
-    if cid not in unlocked or now > unlocked[cid]:
-        if cid in unlocked: del unlocked[cid]
-        left = "тамом шуд" if cid in unlocked else "вохӯрда нашуд"
-        bot.reply_to(m, f"🔒 Вақти 1 соата {left}!\n\nКодро аз нав ворид кун!\n👉 {BLOG_URL}\nКод: {code}")
-        return
-
-    # 3. ВАҚТ МОНДААСТ - ҚУРБРО ДЕҲ
-    left_min = int((unlocked[cid] - now) / 60)
-    btc, eth, ton = get_crypto()
-
-    if "ДОЛЛАР" in up:
-        bot.reply_to(m, f"💵 1 Доллар = 9.2261 сомонӣ\n⏰ {left_min} дақ. монд")
-    elif "РУБЛ" in up:
-        bot.reply_to(m, f"🇷🇺 1 Рубл = 0.1124 сомонӣ\n⏰ {left_min} дақ. монд")
-    elif "ЕВРО" in up:
-        bot.reply_to(m, f"🇪🇺 1 Евро = 10.3655 сомонӣ")
-    elif "ТОН" in up:
-        bot.reply_to(m, f"💎 Тон = ${ton:.2f} = {ton*9.2261:.2f} сомонӣ\n⏰ {left_min} дақ. монд")
-    elif "БИТКОИН" in up or "BTC" in up:
-        bot.reply_to(m, f"₿ Биткоин = ${btc:.2f}\n⏰ {left_min} дақ. монд")
-    elif "ЭФИР" in up or "ETH" in up:
-        bot.reply_to(m, f"♦️ Эфир = ${eth:.2f}")
-    elif "ХАМАИ" in up and "КРИПТО" in up:
-        bot.reply_to(m, f"🚀 Крипто:\n₿ BTC = ${btc:.2f}\n♦️ ETH = ${eth:.2f}\n💎 TON = ${ton:.2f}\n\n⏰ {left_min} дақ. монд")
-    elif "ХАМАИ" in up and "ПУЛ" in up:
-        bot.reply_to(m, f"🌍 Хамаи пулхо:\n💵 Доллар: 9.2261\n🇷🇺 Рубл: 0.1124\n🇪🇺 Евро: 10.3655")
-    else:
-        bot.reply_to(m, f"Навиш: Доллар чанд, Тон чанд\n⏰ {left_min} дақ. монд то қулф")
-
+print("Bot started")
 bot.infinity_polling()
